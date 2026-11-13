@@ -1,104 +1,34 @@
 [
   {
-    "name": "Customer places an order and it persists in the marketplace ledger",
-    "sanity": true,
+    "name": "New visitor can sign in and choose a single ZINGO account type",
     "viewport": "mobile",
-    "covers": [
-      "customer restaurant discovery",
-      "menu item selection",
-      "cart quantity and subtotal",
-      "demo checkout validation",
-      "backend order creation",
-      "database persistence",
-      "customer order confirmation"
-    ],
-    "description": "Verifies a customer can build a basket, place a demo order and see the saved order in the restaurant and operations workspaces after navigation.",
-    "steps": [
-      "Open Order food",
-      "Add Double Smash Burger to the basket",
-      "Open the basket and enter a delivery address if needed",
-      "Place the demo order",
-      "Open Restaurant and confirm the new order is listed",
-      "Open ZINGO Ops and confirm the order appears in the ledger"
-    ],
-    "expected": "The order is created once, the basket clears, and the same saved order is visible in the restaurant and ZINGO operations workspaces."
+    "covers": ["secure authentication", "customer role onboarding", "restaurant role onboarding", "driver role onboarding", "single account role assignment"],
+    "description": "Checks that account setup presents customer, restaurant and driver as distinct onboarding choices and does not expose role-switch tabs.",
+    "steps": ["Open ZINGO", "Continue with secure sign-in", "Complete the authentication flow", "Choose one account type", "Complete the required profile fields"],
+    "expected": "The user profile is created with exactly one selected role. Customer accounts activate; restaurant and driver accounts enter pending approval."
   },
   {
-    "name": "Restaurant advances an order through preparation",
+    "name": "Restaurant and driver accounts require NahaLabs approval",
     "viewport": "desktop",
-    "covers": [
-      "restaurant order dashboard",
-      "order status transitions",
-      "shared order state",
-      "realtime order update"
-    ],
-    "description": "Verifies the restaurant can accept a new order and advance it to ready for driver pickup.",
-    "setup": ["Create a customer order through the customer ordering flow"],
-    "steps": [
-      "Open Restaurant",
-      "Accept the new order",
-      "Start preparing the order",
-      "Mark the order ready"
-    ],
-    "expected": "The order status changes from New order to Ready for pickup and the updated status is visible in the other workspaces."
+    "covers": ["restaurant application pending status", "driver application pending status", "admin application review", "server-side admin authorization"],
+    "description": "Checks that partner accounts cannot access operational workspaces before approval and that the NahaLabs admin can approve or reject applications.",
+    "steps": ["Register as a restaurant or driver", "Confirm the pending-review screen", "Sign in as the NahaLabs administrator", "Review the application", "Approve or reject it"],
+    "expected": "Pending partner accounts remain blocked; only the allowlisted NahaLabs administrator can change application status."
   },
   {
-    "name": "Driver accepts a ready delivery and confirms completion",
-    "viewport": "mobile",
-    "covers": [
-      "driver delivery offers",
-      "driver payout visibility",
-      "driver pickup action",
-      "delivery completion",
-      "driver earnings ledger"
-    ],
-    "description": "Verifies a driver can take a ready order, mark it picked up and confirm delivery.",
-    "setup": [
-      "Create a customer order and advance it through restaurant preparation until it is ready"
-    ],
-    "steps": [
-      "Open Driver",
-      "Review the order and its driver payout",
-      "Accept and pick up the order",
-      "Confirm delivered"
-    ],
-    "expected": "The order reaches Delivered and the driver's demo earnings increase by the displayed driver payout."
-  },
-  {
-    "name": "ZINGO allocation matches the agreed R100 food and R35 delivery example",
+    "name": "Order endpoints enforce customer, restaurant and driver permissions",
     "viewport": "desktop",
-    "covers": [
-      "R92 restaurant allocation",
-      "R32 driver allocation",
-      "R11 ZINGO platform revenue",
-      "R135 total reconciliation",
-      "Paystack test-mode disclosure"
-    ],
-    "description": "Verifies the operations workspace displays the agreed illustrative R135 split and makes clear that payment processing costs are excluded.",
-    "steps": [
-      "Open ZINGO Ops",
-      "Review the transaction model",
-      "Check the R92 restaurant, R32 driver and R11 ZINGO allocation",
-      "Read the payment readiness notice"
-    ],
-    "expected": "The displayed allocations total R135 and clearly state that Paystack approval is pending and live payments are disabled."
+    "covers": ["authenticated order listing", "customer order isolation", "restaurant order isolation", "driver delivery claim", "server-side order state transitions"],
+    "description": "Checks that unauthenticated requests are rejected, customer records are isolated, restaurant status transitions are restricted and drivers can claim a ready delivery only once.",
+    "steps": ["Call order endpoints without signing in", "Sign in as a customer and place an order", "Sign in as a different customer and inspect order history", "Sign in as the restaurant account and advance its order", "Sign in as a driver and claim a ready delivery"],
+    "expected": "Unauthenticated and unauthorized requests are rejected. Users see only permitted orders and server-side transitions prevent cross-role updates."
   },
   {
-    "name": "Reject an invalid order without a basket or delivery address",
+    "name": "Paystack remains clearly marked as unavailable for live checkout",
     "viewport": "mobile",
-    "covers": [
-      "empty basket guardrail",
-      "required delivery address",
-      "backend input validation",
-      "visible checkout error handling"
-    ],
-    "description": "Verifies the checkout cannot create an order with an empty basket or missing delivery address.",
-    "steps": [
-      "Open the basket with no menu items selected",
-      "Try to place an order",
-      "Add a menu item and clear the delivery address",
-      "Try to place the order again"
-    ],
-    "expected": "Checkout remains disabled for an empty basket or missing address, and the backend rejects invalid order payloads without creating a record."
+    "covers": ["payment test-mode disclosure", "no false payment confirmation"],
+    "description": "Ensures the current pilot does not claim a real payment was taken.",
+    "steps": ["Open the customer basket", "Review the checkout notice"],
+    "expected": "The app clearly states that checkout is a demo and no live payment is processed."
   }
 ]
