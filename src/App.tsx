@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, ws } from '@appdeploy/client';
+import AdminApplications from './AdminApplications';
 import {
   ArrowLeft,
   ArrowRight,
@@ -187,10 +188,10 @@ function allocation(food: number, delivery: number) {
   return { restaurant, driver, nahaLabs };
 }
 
-export default function App() {
+export default function App({ role, onSignOut }: { role: 'customer' | 'restaurant' | 'driver' | 'admin'; onSignOut: () => void }) {
   const [view, setView] = useState<
     'customer' | 'restaurant' | 'driver' | 'admin'
-  >('customer');
+  >(role);
   const [cart, setCart] = useState<
     { item: (typeof menu)[number]; qty: number }[]
   >([]);
@@ -367,7 +368,7 @@ export default function App() {
       <header className="topbar">
         <button
           className="brand"
-          onClick={() => setView('customer')}
+          onClick={() => setView(role)}
           aria-label="ZINGO home"
         >
           <span className="brand-mark"><Zap size={22} fill="currentColor" strokeWidth={2.5} /></span>
@@ -379,21 +380,8 @@ export default function App() {
           <ChevronDown size={14} />
         </div>
         <div className="top-actions">
-          <button
-            className="icon-btn"
-            onClick={() => setShowCart(true)}
-            aria-label="Open cart"
-          >
-            <ShoppingBag size={19} />
-            {cartCount > 0 && <i>{cartCount}</i>}
-          </button>
-          <button
-            className="avatar-btn"
-            onClick={() => setView('admin')}
-            aria-label="Open account"
-          >
-            <CircleUserRound size={19} />
-          </button>
+          {role === 'customer' && <button className="icon-btn" onClick={() => setShowCart(true)} aria-label="Open cart"><ShoppingBag size={19} />{cartCount > 0 && <i>{cartCount}</i>}</button>}
+          <button className="avatar-btn" onClick={onSignOut} aria-label="Sign out"><CircleUserRound size={19} /></button>
         </div>
       </header>
 
@@ -403,7 +391,7 @@ export default function App() {
           { id: 'restaurant', label: 'Restaurant', icon: <Store size={16} /> },
           { id: 'driver', label: 'Driver', icon: <Bike size={16} /> },
           { id: 'admin', label: 'ZINGO Ops', icon: <ClipboardList size={16} /> },
-        ].map(item => (
+        ].filter(item => item.id === role).map(item => (
           <button
             key={item.id}
             className={view === item.id ? 'role-tab active' : 'role-tab'}
@@ -497,7 +485,8 @@ export default function App() {
             </div>
             <div className="category-row">
               {['All', 'Burgers', 'Pizza', 'Chicken', 'Sides'].map(
-                (name, index) => (                  <button
+                (name, index) => (
+                  <button
                     key={name}
                     className={
                       category === name
@@ -844,6 +833,7 @@ export default function App() {
               <ShieldCheck size={15} /> TEST MODE · NO LIVE PAYMENTS
             </span>
           </div>
+          <AdminApplications />
           <div className="metric-row">
             <Metric
               label="Total orders"
@@ -996,7 +986,8 @@ export default function App() {
               <EmptyOrders
                 title="Your basket is empty"
                 text="Add a dish from the menu to get started."
-              />            ) : (
+              />
+            ) : (
               <div className="cart-lines">
                 {cart.map(row => (
                   <div className="cart-line" key={row.item.id}>
