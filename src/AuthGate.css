@@ -1,0 +1,27 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap');
+.zg-screen{min-height:100vh;background:#f4f2ee;display:grid;place-items:center;padding:24px;font-family:'DM Sans',sans-serif;color:#201f1b}
+.zg-card{width:min(100%,620px);background:#fff;border:1px solid #e8e3d9;border-radius:26px;padding:clamp(26px,5vw,48px);box-shadow:0 18px 60px #211f1a0d}
+.zg-login{max-width:520px}
+.zg-logo{font:800 26px Manrope,sans-serif;letter-spacing:1px;color:#1e211b}
+.zg-logo span{display:inline-grid;place-items:center;margin-left:8px;width:30px;height:30px;border-radius:9px;background:#f6ca25;font-size:16px}
+.zg-kicker{margin:22px 0 10px;color:#887b51;font-size:11px;font-weight:800;letter-spacing:1.6px}
+.zg-card h1{font:800 clamp(30px,5vw,42px)/1.12 Manrope,sans-serif;margin:8px 0 14px;letter-spacing:-1.4px}
+.zg-copy{color:#69665e;line-height:1.65;font-size:14px;margin:0 0 24px}
+.zg-primary{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;border:0;border-radius:13px;padding:15px 18px;background:#20221c;color:#fff;font-weight:700;font-size:14px;margin-top:18px}
+.zg-primary:disabled{opacity:.55;cursor:wait}
+.zg-legal{font-size:11px;line-height:1.5;color:#99958c;margin-top:18px}
+.zg-role-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:24px 0}
+.zg-role{display:flex;flex-direction:column;align-items:flex-start;gap:9px;text-align:left;padding:17px 13px;border:1px solid #e7e3da;background:#faf9f6;border-radius:15px;color:#25241f;min-height:140px}
+.zg-role strong{font-size:14px}
+.zg-role span{font-size:11px;line-height:1.45;color:#77736b}
+.zg-role.selected{border:2px solid #b89b37;background:#fffdf5;padding:16px 12px}
+.zg-form{display:grid;gap:13px;margin-top:20px}
+.zg-form label{display:grid;gap:7px;font-size:12px;font-weight:700;color:#4d4a42}
+.zg-form input,.zg-form select{width:100%;padding:12px 13px;border:1px solid #dedbd3;border-radius:10px;background:#fff;color:#25241f;font:14px 'DM Sans',sans-serif}
+.zg-form input:focus,.zg-form select:focus{outline:2px solid #d6c17d;border-color:#b89b37}
+.zg-alert{margin-top:16px;padding:12px 14px;border-radius:11px;background:#fff1ed;color:#9b3e2d;font-size:12px;line-height:1.5}
+.zg-text-button{display:block;margin:18px auto 0;border:0;background:none;color:#77736b;text-decoration:underline;font-size:12px}
+.zg-pending{text-align:center;max-width:500px}
+.zg-pending>svg{color:#a58b3b}
+.zg-status{display:flex;justify-content:center;align-items:center;gap:8px;padding:13px;background:#f5f3ec;border-radius:12px;font-size:12px;color:#696047}
+@media(max-width:560px){.zg-role-grid{grid-template-columns:1fr}.zg-role{min-height:0;display:grid;grid-template-columns:26px 1fr;align-items:center}.zg-role span{grid-column:2}.zg-card{padding:25px 20px}}
