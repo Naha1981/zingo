@@ -1,0 +1,104 @@
+[
+  {
+    "name": "Customer places an order and it persists in the marketplace ledger",
+    "sanity": true,
+    "viewport": "mobile",
+    "covers": [
+      "customer restaurant discovery",
+      "menu item selection",
+      "cart quantity and subtotal",
+      "demo checkout validation",
+      "backend order creation",
+      "database persistence",
+      "customer order confirmation"
+    ],
+    "description": "Verifies a customer can build a basket, place a demo order and see the saved order in the restaurant and operations workspaces after navigation.",
+    "steps": [
+      "Open Order food",
+      "Add Double Smash Burger to the basket",
+      "Open the basket and enter a delivery address if needed",
+      "Place the demo order",
+      "Open Restaurant and confirm the new order is listed",
+      "Open ZINGO Ops and confirm the order appears in the ledger"
+    ],
+    "expected": "The order is created once, the basket clears, and the same saved order is visible in the restaurant and ZINGO operations workspaces."
+  },
+  {
+    "name": "Restaurant advances an order through preparation",
+    "viewport": "desktop",
+    "covers": [
+      "restaurant order dashboard",
+      "order status transitions",
+      "shared order state",
+      "realtime order update"
+    ],
+    "description": "Verifies the restaurant can accept a new order and advance it to ready for driver pickup.",
+    "setup": ["Create a customer order through the customer ordering flow"],
+    "steps": [
+      "Open Restaurant",
+      "Accept the new order",
+      "Start preparing the order",
+      "Mark the order ready"
+    ],
+    "expected": "The order status changes from New order to Ready for pickup and the updated status is visible in the other workspaces."
+  },
+  {
+    "name": "Driver accepts a ready delivery and confirms completion",
+    "viewport": "mobile",
+    "covers": [
+      "driver delivery offers",
+      "driver payout visibility",
+      "driver pickup action",
+      "delivery completion",
+      "driver earnings ledger"
+    ],
+    "description": "Verifies a driver can take a ready order, mark it picked up and confirm delivery.",
+    "setup": [
+      "Create a customer order and advance it through restaurant preparation until it is ready"
+    ],
+    "steps": [
+      "Open Driver",
+      "Review the order and its driver payout",
+      "Accept and pick up the order",
+      "Confirm delivered"
+    ],
+    "expected": "The order reaches Delivered and the driver's demo earnings increase by the displayed driver payout."
+  },
+  {
+    "name": "ZINGO allocation matches the agreed R100 food and R35 delivery example",
+    "viewport": "desktop",
+    "covers": [
+      "R92 restaurant allocation",
+      "R32 driver allocation",
+      "R11 ZINGO platform revenue",
+      "R135 total reconciliation",
+      "Paystack test-mode disclosure"
+    ],
+    "description": "Verifies the operations workspace displays the agreed illustrative R135 split and makes clear that payment processing costs are excluded.",
+    "steps": [
+      "Open ZINGO Ops",
+      "Review the transaction model",
+      "Check the R92 restaurant, R32 driver and R11 ZINGO allocation",
+      "Read the payment readiness notice"
+    ],
+    "expected": "The displayed allocations total R135 and clearly state that Paystack approval is pending and live payments are disabled."
+  },
+  {
+    "name": "Reject an invalid order without a basket or delivery address",
+    "viewport": "mobile",
+    "covers": [
+      "empty basket guardrail",
+      "required delivery address",
+      "backend input validation",
+      "visible checkout error handling"
+    ],
+    "description": "Verifies the checkout cannot create an order with an empty basket or missing delivery address.",
+    "steps": [
+      "Open the basket with no menu items selected",
+      "Try to place an order",
+      "Add a menu item and clear the delivery address",
+      "Try to place the order again"
+    ],
+    "expected": "Checkout remains disabled for an empty basket or missing address, and the backend rejects invalid order payloads without creating a record."
+  }
+]
