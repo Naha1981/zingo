@@ -102,12 +102,12 @@ export default function AuthGate() {
     }
   };
 
-  if (loading) return <div className="zg-screen"><div className="zg-card"><div className="zg-logo">ZINGO</div><p>Preparing your account…</p></div></div>;
+  if (loading) return <div className="zg-screen"><div className="zg-card"><div className="zg-logo"><img className="brand-logo" src="/zingo-logo.png" alt="ZINGO" /></div><p>Preparing your account…</p></div></div>;
 
   if (!user) return (
     <div className="zg-screen">
       <section className="zg-card zg-login">
-        <div className="zg-logo">ZINGO<span>⚡</span></div>
+        <div className="zg-logo"><img className="brand-logo" src="/zingo-logo.png" alt="ZINGO" /></div>
         <p className="zg-kicker">LOCAL FOOD. BETTER EARNINGS.</p>
         <h1>One marketplace.<br />Your place in it.</h1>
         <p className="zg-copy">Sign in to order food, run your restaurant or deliver with ZINGO.</p>
@@ -121,7 +121,7 @@ export default function AuthGate() {
   if (!profile) return (
     <div className="zg-screen">
       <section className="zg-card zg-onboard">
-        <div className="zg-logo">ZINGO<span>⚡</span></div>
+        <div className="zg-logo"><img className="brand-logo" src="/zingo-logo.png" alt="ZINGO" /></div>
         <p className="zg-kicker">ACCOUNT SETUP</p>
         <h1>How will you use ZINGO?</h1>
         <p className="zg-copy">Choose the account type you are registering. Your account is assigned to this role.</p>

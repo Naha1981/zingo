@@ -1,0 +1,1 @@
+{"name": "ZINGO", "short_name": "ZINGO", "display": "standalone", "start_url": "/", "background_color": "#ffffff", "theme_color": "#f3b414", "icons": [{"src": "/zingo-icon-192.png", "sizes": "192x192", "type": "image/png"}, {"src": "/zingo-icon-512.png", "sizes": "512x512", "type": "image/png"}]}

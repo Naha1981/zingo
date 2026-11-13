@@ -371,8 +371,7 @@ export default function App({ role, onSignOut }: { role: 'customer' | 'restauran
           onClick={() => setView(role)}
           aria-label="ZINGO home"
         >
-          <span className="brand-mark"><Zap size={22} fill="currentColor" strokeWidth={2.5} /></span>
-          <span>ZINGO</span>
+          <img className="brand-logo" src="/zingo-logo.png" alt="ZINGO" />
         </button>
         <div className="location-pill">
           <MapPin size={15} />
