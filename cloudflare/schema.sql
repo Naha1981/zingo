@@ -1,0 +1,12 @@
+CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,email TEXT NOT NULL UNIQUE,password_hash TEXT NOT NULL,salt TEXT NOT NULL,created_at INTEGER NOT NULL,is_admin INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),expires_at INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS sessions_expiry ON sessions(expires_at);
+CREATE TABLE IF NOT EXISTS profiles(id TEXT PRIMARY KEY REFERENCES users(id),role TEXT NOT NULL,status TEXT NOT NULL,business_name TEXT UNIQUE,data TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS profiles_status ON profiles(status,role);
+CREATE TABLE IF NOT EXISTS orders(id TEXT PRIMARY KEY,customer_id TEXT NOT NULL,restaurant_id TEXT NOT NULL,driver_id TEXT,status TEXT NOT NULL,created_at INTEGER NOT NULL,data TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS orders_customer ON orders(customer_id,created_at);
+CREATE INDEX IF NOT EXISTS orders_restaurant ON orders(restaurant_id,created_at);
+CREATE INDEX IF NOT EXISTS orders_driver ON orders(driver_id,status);
+CREATE INDEX IF NOT EXISTS orders_status ON orders(status,created_at);
+CREATE TABLE IF NOT EXISTS locations(order_id TEXT PRIMARY KEY,lat REAL,lng REAL,accuracy REAL,updated_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS rate_limits(key TEXT PRIMARY KEY,count INTEGER NOT NULL,expires_at INTEGER NOT NULL);

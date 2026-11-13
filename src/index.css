@@ -1,10 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap");
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  font-family: 'DM Sans', sans-serif;
+  font-family: "DM Sans", sans-serif;
   color: #201f1b;
   background: #f4f2ee;
   font-synthesis: none;
@@ -217,7 +217,7 @@ button {
   min-height: 360px;
 }
 .hero-art:after {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
   background:
@@ -385,7 +385,7 @@ button {
   transform: scale(1.04);
 }
 .restaurant-photo:after {
-  content: '';
+  content: "";
   position: absolute;
   inset: 45% 0 0;
   background: linear-gradient(transparent, #0007);
@@ -497,7 +497,8 @@ button {
   place-items: center;
 }
 .workspace,
-.driver-layout {  max-width: 1220px;
+.driver-layout {
+  max-width: 1220px;
   margin: 0 auto;
 }
 .workspace-heading {
@@ -996,7 +997,8 @@ button {
   width: min(460px, 100%);
   height: 100%;
   overflow: auto;
-  background: #fbfaf7;  padding: 25px;
+  background: #fbfaf7;
+  padding: 25px;
   box-shadow: -12px 0 40px #0002;
   display: flex;
   flex-direction: column;
@@ -1356,5 +1358,60 @@ button {
 }
 
 /* Supplied ZINGO wordmark, preserving its proportions. */
-.brand-logo { display: block; width: 140px; height: auto; object-fit: contain; }
-@media (max-width: 640px) { .brand-logo { width: 112px; } }
+.brand-logo {
+  display: block;
+  width: 140px;
+  height: auto;
+  object-fit: contain;
+}
+@media (max-width: 640px) {
+  .brand-logo {
+    width: 112px;
+  }
+}
+.preview-banner {
+  background: #171717;
+  color: #fff;
+  text-align: center;
+  padding: 10px 20px;
+  font-size: 12px;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+}
+.zg-form small {
+  color: #555;
+  line-height: 1.5;
+}
+.zg-form input[type="password"],
+.zg-form input[type="email"] {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.driver-tracking-area {
+  min-width: 0;
+}
+.driver-tracking-area .tracking-panel {
+  margin-top: 0;
+}
+.small-action {
+  min-height: 44px;
+}
+.gps-button {
+  display: inline-block;
+  text-decoration: none;
+  color: #171717;
+  line-height: 1.5;
+}
+.preview-banner {
+  overflow-wrap: anywhere;
+}
+.tracking-panel {
+  min-width: 0;
+}
+.tracking-panel small {
+  color: #555;
+}
+.driver-tracking-area > section p {
+  line-height: 1.6;
+}

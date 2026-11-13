@@ -1,0 +1,12 @@
+{
+  "name": "zingo-preview",
+  "pages_build_output_dir": "dist",
+  "compatibility_date": "2026-11-13",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "zingo-preview-13nov",
+      "database_id": "9bc51121-4d6c-46f0-b63e-1e653e531c69"
+    }
+  ]
+}
