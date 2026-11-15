@@ -79,6 +79,97 @@ const orderOf = (r) =>
     : null;
 const cookie = (token, age = 86400) =>
   `zingo_session=${token}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=${age}`;
+async function limit(db, req, subject, max = 8) {
+  const key = await sha(
+    subject +
+      ":" +
+      (req.headers.get("CF-Connecting-IP") || "unknown") +
+      ":" +
+      Math.floor(Date.now() / 900000),
+  );
+  const r = await db
+    .prepare(
+      "INSERT INTO rate_limits(key,count,expires_at) VALUES(?,1,?) ON CONFLICT(key) DO UPDATE SET count=count+1 RETURNING count",
+    )
+    .bind(key, Date.now() + 900000)
+    .first();
+  if (r.count > max) fail("Too many attempts. Wait 15 minutes.", 429);
+}
+async function audit(db, userId, action) {
+  await db
+    .prepare(
+      "INSERT INTO access_audit(id,user_id,action,created_at) VALUES(?,?,?,?)",
+    )
+    .bind(crypto.randomUUID(), userId, action, Date.now())
+    .run();
+}
+async function mailToken(env, user, purpose, origin) {
+  // A verified sender binding is required. Never return tokens in an API response.
+  if (!env.MAILER?.send)
+    fail(
+      "Email service is not configured. Account access remains restricted.",
+      503,
+    );
+  const token = random(),
+    expires = Date.now() + (purpose === "recover" ? 900000 : 600000);
+  await env.DB.prepare("DELETE FROM auth_tokens WHERE user_id=? AND purpose=?")
+    .bind(user.id, purpose)
+    .run();
+  const hash = await sha(token);
+  await env.DB.prepare(
+    "INSERT INTO auth_tokens(token_hash,user_id,purpose,expires_at) VALUES(?,?,?,?)",
+  )
+    .bind(hash, user.id, purpose, expires)
+    .run();
+  try {
+    await env.MAILER.send({
+      to: user.email,
+      subject:
+        purpose === "recover"
+          ? "Reset your ZINGO password"
+          : purpose === "owner"
+            ? "Confirm your ZINGO owner sign-in"
+            : "Verify your ZINGO email",
+      url: origin + "/#auth=" + purpose + "&token=" + token,
+      expiresAt: expires,
+    });
+  } catch {
+    await env.DB.prepare("DELETE FROM auth_tokens WHERE token_hash=?")
+      .bind(hash)
+      .run();
+    fail("Email could not be sent. Please try again later.", 503);
+  }
+}
+async function takeToken(db, token, purpose) {
+  if (typeof token !== "string" || !/^[a-f0-9]{64}$/.test(token))
+    fail("This link is invalid or expired.", 400);
+  const row = await db
+    .prepare(
+      "UPDATE auth_tokens SET used_at=? WHERE token_hash=? AND purpose=? AND used_at IS NULL AND expires_at>? RETURNING user_id",
+    )
+    .bind(Date.now(), await sha(token), purpose, Date.now())
+    .first();
+  if (!row) fail("This link is invalid or expired.", 400);
+  return row.user_id;
+}
+async function issueSession(db, userId, owner = false) {
+  const token = random(),
+    hash = await sha(token);
+  await db
+    .prepare(
+      "INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)",
+    )
+    .bind(hash, userId, Date.now() + 86400000)
+    .run();
+  if (owner)
+    await db
+      .prepare(
+        "INSERT INTO owner_sessions(token_hash,verified_until) VALUES(?,?)",
+      )
+      .bind(hash, Date.now() + 1800000)
+      .run();
+  return cookie(token);
+}
 async function handler(req, env) {
   const url = new URL(req.url),
     path = url.pathname,
@@ -106,6 +197,90 @@ async function handler(req, env) {
     } catch {
       fail("Invalid request");
     }
+  }
+  if (
+    ["/api/auth/request-verification", "/api/auth/recover"].includes(path) &&
+    method === "POST"
+  ) {
+    await limit(db, req, "email-ip", 12);
+    const email = clean(body.email, 254).toLowerCase();
+    await limit(db, req, "email:" + email, 4);
+    if (!env.MAILER?.send)
+      fail(
+        "Email service is not configured. Account access remains restricted.",
+        503,
+      );
+    const u = await db
+      .prepare("SELECT * FROM users WHERE email=?")
+      .bind(email)
+      .first();
+    if (u)
+      await mailToken(
+        env,
+        u,
+        path.endsWith("recover") ? "recover" : "verify",
+        url.origin,
+      );
+    return json({
+      ok: true,
+      message:
+        "If this account exists, an email has been sent. Check your inbox.",
+    });
+  }
+  if (path === "/api/auth/complete" && method === "POST") {
+    await limit(db, req, "complete", 20);
+    const purpose = body.purpose;
+    if (!["verify", "recover", "owner"].includes(purpose))
+      fail("Invalid link.");
+    if (
+      purpose === "recover" &&
+      (typeof body.password !== "string" ||
+        body.password.length < 12 ||
+        body.password.length > 128)
+    )
+      fail("Use a password of 12 to 128 characters.");
+    const id = await takeToken(db, body.token, purpose);
+    const u = await db
+      .prepare("SELECT * FROM users WHERE id=?")
+      .bind(id)
+      .first();
+    if (!u) fail("Invalid link.");
+    if (purpose === "recover") {
+      const salt = random(),
+        hash = await passwordHash(body.password, salt);
+      await db.batch([
+        db
+          .prepare("UPDATE users SET salt=?,password_hash=? WHERE id=?")
+          .bind(salt, hash, id),
+        db
+          .prepare(
+            "DELETE FROM owner_sessions WHERE token_hash IN (SELECT token_hash FROM sessions WHERE user_id=?)",
+          )
+          .bind(id),
+        db.prepare("DELETE FROM sessions WHERE user_id=?").bind(id),
+        db.prepare("DELETE FROM auth_tokens WHERE user_id=?").bind(id),
+      ]);
+    }
+    await db
+      .prepare(
+        "INSERT INTO email_checks(user_id,verified_at) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET verified_at=excluded.verified_at",
+      )
+      .bind(id, Date.now())
+      .run();
+    await audit(db, id, purpose + "_complete");
+    if (purpose === "owner") {
+      if (!u.is_admin) fail("Owner access required.", 403);
+      return json({ ok: true }, 200, {
+        "set-cookie": await issueSession(db, id, true),
+      });
+    }
+    return json({
+      ok: true,
+      message:
+        purpose === "recover"
+          ? "Password changed. All previous sessions are signed out. Sign in again."
+          : "Email verified. Sign in to continue.",
+    });
   }
   if (path === "/api/auth/register" || path === "/api/auth/login") {
     if (method !== "POST") fail("Method not allowed", 405);
@@ -157,26 +332,41 @@ async function handler(req, env) {
       if (!user || !equal(hash, user.password_hash))
         fail("Email or password is incorrect.", 401);
     }
-    const token = random();
-    await db
-      .prepare(
-        "INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)",
-      )
-      .bind(await sha(token), user.id, Date.now() + 86400000)
-      .run();
-    await db.batch([
-      db.prepare("DELETE FROM sessions WHERE expires_at<?").bind(Date.now()),
-      db.prepare("DELETE FROM rate_limits WHERE expires_at<?").bind(Date.now()),
-    ]);
+    const verified = await db
+      .prepare("SELECT verified_at FROM email_checks WHERE user_id=?")
+      .bind(user.id)
+      .first();
+    if (!verified) {
+      if (env.MAILER?.send) await mailToken(env, user, "verify", url.origin);
+      return json({
+        user: null,
+        verificationRequired: true,
+        message: env.MAILER?.send
+          ? "Check your email to verify your account before signing in."
+          : "Account saved. Email delivery is not configured; access remains restricted.",
+      });
+    }
+    if (user.is_admin) {
+      await mailToken(env, user, "owner", url.origin);
+      await audit(db, user.id, "owner_challenge");
+      return json({
+        user: null,
+        ownerChallenge: true,
+        message:
+          "Password accepted. Open the owner confirmation link sent to your verified email. It expires in 10 minutes.",
+      });
+    }
+    await audit(db, user.id, "sign_in");
     return json({ user: { userId: user.id, email: user.email } }, 200, {
-      "set-cookie": cookie(token),
+      "set-cookie": await issueSession(db, user.id),
     });
   }
+
   const token = (req.headers.get("cookie") || "").match(
     /(?:^|;\s*)zingo_session=([a-f0-9]{64})(?:;|$)/,
   )?.[1];
   const tokenHash = token ? await sha(token) : "";
-  const user = token
+  let user = token
     ? await db
         .prepare(
           "SELECT u.id,u.email,u.is_admin FROM sessions s JOIN users u ON s.user_id=u.id WHERE s.token_hash=? AND s.expires_at>?",
@@ -184,6 +374,21 @@ async function handler(req, env) {
         .bind(tokenHash, Date.now())
         .first()
     : null;
+  if (user) {
+    const verified = await db
+      .prepare("SELECT verified_at FROM email_checks WHERE user_id=?")
+      .bind(user.id)
+      .first();
+    const owner = user.is_admin
+      ? await db
+          .prepare(
+            "SELECT verified_until FROM owner_sessions WHERE token_hash=? AND verified_until>?",
+          )
+          .bind(tokenHash, Date.now())
+          .first()
+      : true;
+    if (!verified || !owner) user = null;
+  }
   if (path === "/api/auth/me")
     return json({ user: user ? { userId: user.id, email: user.email } : null });
   if (!user) fail("Sign in first.", 401);
@@ -192,6 +397,27 @@ async function handler(req, env) {
       .prepare("DELETE FROM sessions WHERE token_hash=?")
       .bind(tokenHash)
       .run();
+    return json({ ok: true }, 200, { "set-cookie": cookie("", 0) });
+  }
+  if (path === "/api/auth/security" && method === "GET") {
+    const r = await db
+      .prepare(
+        "SELECT action,created_at FROM access_audit WHERE user_id=? ORDER BY created_at DESC LIMIT 20",
+      )
+      .bind(user.id)
+      .all();
+    return json({ events: r.results });
+  }
+  if (path === "/api/auth/revoke-all" && method === "POST") {
+    await db.batch([
+      db
+        .prepare(
+          "DELETE FROM owner_sessions WHERE token_hash IN (SELECT token_hash FROM sessions WHERE user_id=?)",
+        )
+        .bind(user.id),
+      db.prepare("DELETE FROM sessions WHERE user_id=?").bind(user.id),
+    ]);
+    await audit(db, user.id, "revoke_all");
     return json({ ok: true }, 200, { "set-cookie": cookie("", 0) });
   }
   const pr = await db
@@ -225,8 +451,35 @@ async function handler(req, env) {
       vehicleRegistration = clean(body.vehicleRegistration, 30);
     if (role === "restaurant" && (!businessName || !businessAddress))
       fail("Restaurant name and address are required.");
-    if (role === "driver" && (!vehicleType || !vehicleRegistration))
+    if (
+      role === "driver" &&
+      (!["Car", "Motorcycle", "Scooter", "Bicycle"].includes(vehicleType) ||
+        (vehicleType !== "Bicycle" && !vehicleRegistration))
+    )
       fail("Vehicle details are required.");
+    const setup = {
+      serviceArea: clean(body.serviceArea, 160),
+      operatingHours: clean(body.operatingHours, 300),
+      contactEmail: clean(body.contactEmail, 254),
+      menuPlan: clean(body.menuPlan, 1200),
+      eligibilityConfirmed: body.eligibilityConfirmed === true,
+    };
+    if (
+      role !== "customer" &&
+      (!/^\+?[0-9 ()-]{10,20}$/.test(phone) ||
+        !setup.serviceArea ||
+        !setup.eligibilityConfirmed)
+    )
+      fail(
+        "Enter a contact phone, service area and confirm the partner requirements.",
+      );
+    if (
+      role === "restaurant" &&
+      (!setup.operatingHours ||
+        !setup.menuPlan ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(setup.contactEmail))
+    )
+      fail("Enter opening hours, contact email and your menu setup plan.");
     const p = {
       id: user.id,
       email: user.email,
@@ -234,10 +487,17 @@ async function handler(req, env) {
       status: role === "customer" ? "active" : "pending",
       fullName,
       phone,
+      ...(role !== "customer" ? { setup, reviewChecks: [] } : {}),
       ...(role === "restaurant"
         ? { businessName, businessAddress, cuisine: clean(body.cuisine, 100) }
         : {}),
-      ...(role === "driver" ? { vehicleType, vehicleRegistration } : {}),
+      ...(role === "driver"
+        ? {
+            vehicleType,
+            vehicleRegistration:
+              vehicleType === "Bicycle" ? "" : vehicleRegistration,
+          }
+        : {}),
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -280,8 +540,29 @@ async function handler(req, env) {
         .bind(m[1])
         .first();
       if (!p) fail("Pending application not found.", 404);
+      const applicant = JSON.parse(p.data);
+      if (
+        body.decision === "approved" &&
+        (!applicant.setup?.eligibilityConfirmed ||
+          !applicant.setup?.serviceArea)
+      )
+        fail(
+          "Partner setup is incomplete. Request an updated application before approval.",
+        );
+      const required =
+        p.role === "driver"
+          ? ["identity", "vehicle", "contact", "service-area"]
+          : ["business", "menu", "contact", "service-area"];
+      if (
+        body.decision === "approved" &&
+        !required.every(
+          (k) => Array.isArray(body.checks) && body.checks.includes(k),
+        )
+      )
+        fail("Record every required partner check before approval.");
       const data = {
         ...JSON.parse(p.data),
+        reviewChecks: body.decision === "approved" ? required : [],
         status: body.decision,
         approvedBy: user.email,
         updatedAt: Date.now(),
@@ -514,16 +795,15 @@ async function handler(req, env) {
         ) {
           driver = user.id;
           data.driverName = profile.fullName;
-        } else if (
-          !(
-            row.status === "picked_up" &&
-            body.status === "delivered" &&
-            row.driver_id === user.id
-          )
-        )
+        } else if (!(
+          row.status === "picked_up" &&
+          body.status === "delivered" &&
+          row.driver_id === user.id
+        ))
           fail("Delivery unavailable.", 409);
       } else fail("This account cannot update this order.", 403);
       data.status = body.status;
+      if (body.status === "delivered") data.deliveredAt = Date.now();
       if (driver) data.driverId = driver;
       const r = await db
         .prepare(

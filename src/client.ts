@@ -27,11 +27,11 @@ export const auth = {
     email: string,
     password: string,
     create: boolean,
-  ): Promise<User> =>
+  ): Promise<{ user: User | null; message?: string }> =>
     (
       await api.post(create ? "/api/auth/register" : "/api/auth/login", {
         email,
         password,
       })
-    ).data.user,
+    ).data,
 };

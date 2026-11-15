@@ -27,7 +27,7 @@ This preview was created on the verified Workers Free plan. Limits are shared wi
 ## Account and order rules
 
 - Registration uses email/password and an HttpOnly, Secure, SameSite=Strict session cookie. Passwords are salted PBKDF2 hashes, not plaintext.
-- This is a preview: email verification and password recovery are not implemented. Do not reuse passwords or add sensitive personal information.
+- This test branch adds email verification and password recovery behind a required sender binding. Without the binding, access fails closed. Do not reuse passwords or add sensitive personal information.
 - Customers become active after onboarding. Restaurant and driver applications need approval.
 - An email address never grants administrator access. The server-side administrator flag is assigned only after a trusted, controlled owner signup. There is no public bootstrap or self-approval endpoint.
 - Orders bind to the approved restaurant's stable account ID, not its displayed name. Server menu prices determine totals. Role and state transitions are checked in the API.
@@ -57,3 +57,25 @@ This preview was created on the verified Workers Free plan. Limits are shared wi
 ## Rollback
 
 Use the existing AppDeploy application while this preview is being reviewed. Nothing in this deployment changes its code, domain, credentials or data. A Pages deployment can also be rolled back independently in its deployment history. GitHub publication is a separate approval step.
+
+## 15 November test branch: fixes 1, 2 and 5
+
+Not pushed or deployed. Branch `staging/15nov-auth-onboarding-totals` starts at `3ddb440`. The original AppDeploy host is not changed by this source. Its provider-managed legal URLs require a separate approved provider setting change; the new `/terms`, `/privacy` and `/help` content applies to this Pages source only. These are restricted-preview notices, not production legal signoff.
+
+### Deployment gates (do not deploy this automatically)
+
+1. Apply `cloudflare/migrations/0002_safety.sql` only under separate approved database/deployment authority. Existing accounts have no verified-email record, so existing sessions will be refused until verification. Owner status remains a controlled database grant, never email-based or a public role choice. Do not silently mark existing users verified.
+2. Configure an approved email sender binding named `MAILER` with RPC method `send({to,subject,url,expiresAt})`. The binding must deliver the link to that exact address, fail on delivery rejection, never log token URLs, and must not echo the link to the caller. No such sender is provisioned here. Tokens are hashed in the database, expire in 10 minutes (verification/owner) or 15 minutes (reset), and are consumed once by a confirmation POST. Test transport is an in-memory outbox only. No external email was sent. The sender service and DNS/account setup remain an explicit release gate; free-tier quota and deliverability must be checked before choosing one.
+3. Owner login requires password plus a single-use email confirmation every new session; owner privilege expires after 30 minutes. This is email step-up, not TOTP, passkeys or hardware MFA. Verify actual sender access, session revocation and recovery in an isolated hosted test before exposing the branch. Audit records contain event type/time/account ID only, not tokens/passwords. Set retention and housekeeping before public launch.
+4. Partner setup records service area, contact details, restaurant opening hours/menu review plan and driver vehicle type. It does not collect identity documents or bank details, prove eligibility, edit an operational menu, or verify a real business. Approval requires the owner to record all relevant checks; secure real-world document review and operational menu tooling are not implemented by this patch. Existing approved partner records are not automatically re-approved or rewritten.
+5. Completed-today totals use `Africa/Johannesburg` completion date. New completed orders get `deliveredAt`. Historic orders without a trustworthy completion timestamp are excluded, not guessed to have completed today.
+6. Payment integration, refunds/cancellations and real delivery/GPS validation remain outside these approved fixes. No production settings, data or code were changed.
+
+### Repeatable tests
+
+- `npm test`: inherited backend order/GPS checks (42).
+- `npm run test:safety`: isolated SQLite auth/onboarding/privacy/date checks (37).
+- `npm run build`: strict TypeScript and production bundle.
+- `ZINGO_PLAYWRIGHT_MODULE=/path/to/existing/playwright npm run test:browser`: 26 browser checks with an isolated in-memory database/mail outbox. Uses an existing Chromium at `/usr/bin/google-chrome`. No package installation or real email/payment required. Four separate browser contexts exercise customer, restaurant, driver and owner. The server is bound only to loopback, never a public deployment.
+
+The fixture passwords, addresses and accounts in tests are synthetic test-only data and are never written to the hosted app. Owner fixtures are promoted only inside the isolated test database.

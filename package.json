@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build && node scripts/package-pages.mjs",
     "preview": "vite preview",
-    "test": "node tests/backend.mjs"
+    "test": "node tests/backend.mjs",
+    "test:safety": "node tests/safety.mjs",
+    "test:browser": "node tests/browser.mjs"
   },
   "dependencies": {
     "leaflet": "^1.9.4",

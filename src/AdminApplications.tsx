@@ -14,6 +14,12 @@ type Application = {
   vehicleType?: string;
   vehicleRegistration?: string;
   createdAt: number;
+  setup?: {
+    serviceArea?: string;
+    operatingHours?: string;
+    contactEmail?: string;
+    menuPlan?: string;
+  };
 };
 
 export default function AdminApplications() {
@@ -21,6 +27,7 @@ export default function AdminApplications() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState("");
   const [notice, setNotice] = useState("");
+  const [checks, setChecks] = useState<Record<string, string[]>>({});
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -42,7 +49,10 @@ export default function AdminApplications() {
   const decide = async (id: string, decision: "approved" | "rejected") => {
     setBusyId(id);
     try {
-      await api.put("/api/admin/applications/" + id, { decision });
+      await api.put("/api/admin/applications/" + id, {
+        decision,
+        checks: checks[id] || [],
+      });
       setApplications((current) => current.filter((item) => item.id !== id));
     } catch {
       setNotice("Could not update this application. Refresh and try again.");
@@ -100,6 +110,40 @@ export default function AdminApplications() {
                   </span>
                 )}
               </div>
+              <p>
+                Area: {item.setup?.serviceArea || "Not supplied"}. Hours:{" "}
+                {item.setup?.operatingHours || "Not supplied"}
+              </p>
+              <p>
+                {item.setup?.contactEmail} {item.setup?.menuPlan}
+              </p>
+              <fieldset>
+                <legend>Partner checks completed outside this form</legend>
+                {(item.role === "driver"
+                  ? ["identity", "vehicle", "contact", "service-area"]
+                  : ["business", "menu", "contact", "service-area"]
+                ).map((key) => (
+                  <label className="zg-check" key={key}>
+                    <input
+                      type="checkbox"
+                      checked={(checks[item.id] || []).includes(key)}
+                      onChange={(e) =>
+                        setChecks({
+                          ...checks,
+                          [item.id]: e.target.checked
+                            ? [...(checks[item.id] || []), key]
+                            : (checks[item.id] || []).filter((k) => k !== key),
+                        })
+                      }
+                    />
+                    {key}
+                  </label>
+                ))}
+                <small>
+                  No automated identity or document verification is claimed.
+                  Approval records these reviewed checks.
+                </small>
+              </fieldset>
               <div className="order-card-bottom">
                 <span>
                   Submitted {new Date(item.createdAt).toLocaleDateString()}
@@ -107,7 +151,9 @@ export default function AdminApplications() {
                 <div style={{ display: "flex", gap: 8 }}>
                   <button
                     className="small-action"
-                    disabled={busyId === item.id}
+                    disabled={
+                      busyId === item.id || (checks[item.id] || []).length !== 4
+                    }
                     onClick={() => decide(item.id, "approved")}
                   >
                     <Check size={14} /> Approve

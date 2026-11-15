@@ -1,7 +1,9 @@
+import { completedToday } from "./daily";
 import DeliveryTracking from "./DeliveryTracking";
 import { Pin, validPin } from "./tracking";
 import { useEffect, useState } from "react";
 import { api } from "./client";
+import AccountSafety from "./AccountSafety";
 import AdminApplications from "./AdminApplications";
 import {
   ArrowRight,
@@ -32,12 +34,7 @@ import {
 } from "lucide-react";
 
 type OrderStatus =
-  | "placed"
-  | "accepted"
-  | "preparing"
-  | "ready"
-  | "picked_up"
-  | "delivered";
+  "placed" | "accepted" | "preparing" | "ready" | "picked_up" | "delivered";
 type Order = {
   id: string;
   customerName: string;
@@ -53,6 +50,7 @@ type Order = {
   status: OrderStatus;
   driverName?: string;
   createdAt: number;
+  deliveredAt?: number;
   destination?: Pin;
 };
 
@@ -381,9 +379,7 @@ export default function App({
   };
 
   const openOrders = orders.filter((order) => order.status !== "delivered");
-  const completedOrders = orders.filter(
-    (order) => order.status === "delivered",
-  );
+  const completedOrders = completedToday(orders);
 
   return (
     <div className="app-shell">
@@ -720,7 +716,7 @@ export default function App({
               icon={<Package />}
             />
             <Metric
-              label="Completed today"
+              label="Completed today (SAST)"
               value={String(completedOrders.length)}
               icon={<Check />}
             />
@@ -808,15 +804,19 @@ export default function App({
           </div>
           <div className="driver-summary">
             <div>
-              <span className="eyebrow">TODAY'S DEMO EARNINGS</span>
+              <span className="eyebrow">TODAY'S DEMO EARNINGS (SAST)</span>
               <strong>
                 {money(
-                  orders
-                    .filter((order) => order.status === "delivered")
-                    .reduce((sum, order) => sum + order.driverPayout, 0),
+                  completedOrders.reduce(
+                    (sum, order) => sum + order.driverPayout,
+                    0,
+                  ),
                 )}
               </strong>
-              <small>{completedOrders.length} completed deliveries</small>
+              <small>
+                {completedOrders.length} completed deliveries today. Older
+                orders without a completion time are excluded.
+              </small>
             </div>
             <div className="driver-summary-icon">
               <Bike size={27} />
@@ -914,6 +914,7 @@ export default function App({
               <ShieldCheck size={15} /> TEST MODE · NO LIVE PAYMENTS
             </span>
           </div>
+          <AccountSafety />
           <AdminApplications />
           <div className="metric-row">
             <Metric
@@ -1192,7 +1193,12 @@ export default function App({
         <span>
           ZINGO <b>·</b> Made for local food.
         </span>
-        <span>Johannesburg pilot prototype · Payments in test mode</span>
+        <span>Preview only · No payment provider connected</span>
+        <nav className="zg-account-links">
+          <a href="/terms">Preview terms</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/help">Help</a>
+        </nav>
       </footer>
       {loading && (
         <div className="loading-bar">Connecting to ZINGO marketplace…</div>

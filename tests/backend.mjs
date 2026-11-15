@@ -26,6 +26,7 @@ function stmt(query, values = []) {
 const env = {
   DB: { prepare: stmt, batch: (qs) => Promise.all(qs.map((q) => q.run())) },
   ASSETS: { fetch: () => new Response("static") },
+  MAILER: { send: async () => {} },
 };
 const origin = "https://test.invalid";
 let n = 0;
@@ -55,22 +56,37 @@ function check(condition, label) {
   console.log("PASS", ++n, label);
 }
 async function signup(name, role) {
-  const r = await call("POST", "/api/auth/register", {
+  let r = await call("POST", "/api/auth/register", {
     email: name + "@test.invalid",
     password: "Fixture-only-NotARealLogin-123!",
   });
   check(r.status === 200, "signup " + name);
+  const u = sql
+    .prepare("SELECT id FROM users WHERE email=?")
+    .get(name + "@test.invalid");
+  sql
+    .prepare("INSERT INTO email_checks(user_id,verified_at) VALUES(?,?)")
+    .run(u.id, Date.now());
+  r = await call("POST", "/api/auth/login", {
+    email: name + "@test.invalid",
+    password: "Fixture-only-NotARealLogin-123!",
+  });
   const p = await call(
     "POST",
     "/api/onboarding",
     {
       role,
       fullName: "Fictional " + name,
-      phone: "000-TEST",
+      phone: "+27000000000",
       businessName: name,
       businessAddress: "Fictional test address",
       vehicleType: "Car",
       vehicleRegistration: "TEST-NOT-REAL",
+      serviceArea: "Fictional area",
+      operatingHours: "Mon-Fri 9-5",
+      contactEmail: "fixture@test.invalid",
+      menuPlan: "Fictional menu for review",
+      eligibilityConfirmed: true,
     },
     r.cookie,
   );

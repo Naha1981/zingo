@@ -62,6 +62,52 @@ export default function AuthGate() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [createAccount, setCreateAccount] = useState(false);
+  const [authMode, setAuthMode] = useState("");
+  const [setup, setSetup] = useState({
+    serviceArea: "",
+    operatingHours: "",
+    contactEmail: "",
+    menuPlan: "",
+    eligibilityConfirmed: false,
+  });
+  const [authHash, setAuthHash] = useState(location.hash);
+  useEffect(() => {
+    const changed = () => setAuthHash(location.hash);
+    addEventListener("hashchange", changed);
+    return () => removeEventListener("hashchange", changed);
+  }, []);
+  const linkParams = new URLSearchParams(authHash.slice(1));
+  const linkPurpose = linkParams.get("auth");
+  const linkToken = linkParams.get("token");
+  const accountAction = async (action: string) => {
+    setBusy(true);
+    setMessage("");
+    try {
+      const r = await api.post(
+        action === "complete"
+          ? "/api/auth/complete"
+          : action === "recover"
+            ? "/api/auth/recover"
+            : "/api/auth/request-verification",
+        action === "complete"
+          ? { purpose: linkPurpose, token: linkToken, password }
+          : { email },
+      );
+      setMessage(r.data.message || "Owner sign-in confirmed.");
+      if (action === "complete") {
+        history.replaceState(null, "", location.pathname);
+        setAuthHash("");
+        setCreateAccount(false);
+        setAuthMode("");
+        setPassword("");
+        await loadProfile();
+      }
+    } catch (e: any) {
+      setMessage(e?.response?.data?.error || "Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const loadProfile = async () => {
     const current = await auth.getUser();
@@ -104,7 +150,9 @@ export default function AuthGate() {
     setBusy(true);
     setMessage("");
     try {
-      await auth.login(email, password, createAccount);
+      const result: any = await auth.login(email, password, createAccount);
+      if (!result.user)
+        setMessage(result.message || "Check your inbox to continue.");
       setPassword("");
       await loadProfile();
     } catch (err: any) {
@@ -148,6 +196,7 @@ export default function AuthGate() {
         cuisine,
         vehicleType,
         vehicleRegistration,
+        ...setup,
       });
       setProfile(result.data.profile);
     } catch (err: any) {
@@ -160,6 +209,48 @@ export default function AuthGate() {
     }
   };
 
+  if (linkPurpose && linkToken)
+    return (
+      <div className="zg-screen">
+        <section className="zg-card">
+          <img className="brand-logo" src="/zingo-logo.png" alt="ZINGO" />
+          <h1>
+            {linkPurpose === "recover"
+              ? "Set a new password"
+              : linkPurpose === "owner"
+                ? "Confirm owner sign-in"
+                : "Verify your email"}
+          </h1>
+          <p>
+            Only continue if you requested this link. Links expire and work
+            once.
+          </p>
+          {linkPurpose === "recover" && (
+            <label>
+              New password
+              <input
+                aria-label="New password"
+                type="password"
+                autoComplete="new-password"
+                minLength={12}
+                maxLength={128}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </label>
+          )}
+          {message && <p role="status">{message}</p>}
+          <button
+            className="zg-primary"
+            disabled={busy}
+            onClick={() => accountAction("complete")}
+          >
+            Confirm
+          </button>
+          <a href="/">Back to sign in</a>
+        </section>
+      </div>
+    );
   if (loading)
     return (
       <div className="zg-screen">
@@ -190,61 +281,116 @@ export default function AuthGate() {
             food orders or payments.
           </p>
           {message && <div className="zg-alert">{message}</div>}
-          <form className="zg-form" onSubmit={signIn}>
-            <label>
-              Email
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-              />
-            </label>
-            <label>
-              Password
-              <input
-                type="password"
-                minLength={12}
-                maxLength={128}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete={
-                  createAccount ? "new-password" : "current-password"
-                }
-              />
-            </label>
-            <small>
-              Use 12 or more characters. Do not reuse another account's
-              password.
-            </small>
-            <button className="zg-primary" disabled={busy}>
-              <LogIn size={17} />{" "}
-              {busy
-                ? "Please wait…"
-                : createAccount
-                  ? "Create preview account"
-                  : "Sign in"}
-            </button>
-          </form>
-          <button
-            className="zg-text-button"
-            onClick={() => {
-              setCreateAccount(!createAccount);
-              setMessage("");
-            }}
-          >
-            {createAccount
-              ? "Already registered? Sign in"
-              : "New here? Create an account"}
-          </button>
+          {authMode ? (
+            <form
+              className="zg-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                accountAction(authMode);
+              }}
+            >
+              <h2>
+                {authMode === "recover" ? "Reset password" : "Verify email"}
+              </h2>
+              <label>
+                Email
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </label>
+              <button className="zg-primary" disabled={busy}>
+                Send email link
+              </button>
+              <button
+                type="button"
+                className="zg-text-button"
+                onClick={() => setAuthMode("")}
+              >
+                Back to sign in
+              </button>
+            </form>
+          ) : (
+            <>
+              <form className="zg-form" onSubmit={signIn}>
+                <label>
+                  Email
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    autoComplete="email"
+                  />
+                </label>
+                <label>
+                  Password
+                  <input
+                    type="password"
+                    minLength={12}
+                    maxLength={128}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    autoComplete={
+                      createAccount ? "new-password" : "current-password"
+                    }
+                  />
+                </label>
+                <small>
+                  Use 12 or more characters. Do not reuse another account's
+                  password.
+                </small>
+                <button className="zg-primary" disabled={busy}>
+                  <LogIn size={17} />{" "}
+                  {busy
+                    ? "Please wait…"
+                    : createAccount
+                      ? "Create preview account"
+                      : "Sign in"}
+                </button>
+              </form>
+              <button
+                className="zg-text-button"
+                onClick={() => {
+                  setCreateAccount(!createAccount);
+                  setMessage("");
+                }}
+              >
+                {createAccount
+                  ? "Already registered? Sign in"
+                  : "New here? Create an account"}
+              </button>
+              <div className="zg-account-links">
+                <button
+                  className="zg-text-button"
+                  onClick={() => setAuthMode("recover")}
+                >
+                  Forgot password?
+                </button>
+                <button
+                  className="zg-text-button"
+                  onClick={() => setAuthMode("verify")}
+                >
+                  Resend verification
+                </button>
+              </div>
+            </>
+          )}
           <p className="zg-legal">
-            Preview only. Email verification and password recovery are not
-            available yet. Use fictional details for testing. Your account and
-            test orders are saved on this separate preview; old app accounts are
-            not copied.
+            Test copy only. Use fictional details. Email verification is
+            required for access; delivery must be configured before release.
+            Owner access requires a password and a single-use email link,
+            expires after 30 minutes and cannot be selected at signup. No real
+            orders or payments.
           </p>
+          <nav className="zg-account-links">
+            <a href="/terms">Preview terms</a>
+            <a href="/privacy">Privacy</a>
+            <a href="/help">Help</a>
+          </nav>
         </section>
       </div>
     );
@@ -332,6 +478,82 @@ export default function AuthGate() {
                   </label>
                 </>
               )}
+              {role !== "customer" && (
+                <>
+                  <label>
+                    Service area
+                    <input
+                      required
+                      value={setup.serviceArea}
+                      onChange={(e) =>
+                        setSetup({ ...setup, serviceArea: e.target.value })
+                      }
+                      placeholder="Suburbs served"
+                    />
+                  </label>
+                  {role === "restaurant" && (
+                    <>
+                      <label>
+                        Opening hours
+                        <input
+                          required
+                          value={setup.operatingHours}
+                          onChange={(e) =>
+                            setSetup({
+                              ...setup,
+                              operatingHours: e.target.value,
+                            })
+                          }
+                          placeholder="Days, opening and closing times"
+                        />
+                      </label>
+                      <label>
+                        Business contact email
+                        <input
+                          type="email"
+                          required
+                          value={setup.contactEmail}
+                          onChange={(e) =>
+                            setSetup({ ...setup, contactEmail: e.target.value })
+                          }
+                        />
+                      </label>
+                      <label>
+                        Menu setup plan
+                        <textarea
+                          required
+                          value={setup.menuPlan}
+                          onChange={(e) =>
+                            setSetup({ ...setup, menuPlan: e.target.value })
+                          }
+                          placeholder="Dishes, prices, allergens and availability to review with NahaLabs"
+                        />
+                      </label>
+                    </>
+                  )}
+                  <label className="zg-check">
+                    <input
+                      type="checkbox"
+                      checked={setup.eligibilityConfirmed}
+                      onChange={(e) =>
+                        setSetup({
+                          ...setup,
+                          eligibilityConfirmed: e.target.checked,
+                        })
+                      }
+                      required
+                    />
+                    {role === "restaurant"
+                      ? "I can provide business, food safety and menu details for review before activation."
+                      : "I am eligible to deliver and can provide identity and vehicle details through an approved secure review process."}
+                  </label>
+                  <p className="zg-legal">
+                    Do not put ID numbers, documents or bank details here. This
+                    form does not verify your identity. NahaLabs must complete
+                    the partner checks separately before approval.
+                  </p>
+                </>
+              )}
               {role === "driver" && (
                 <>
                   <label>
@@ -346,14 +568,16 @@ export default function AuthGate() {
                       <option>Scooter</option>
                     </select>
                   </label>
-                  <label>
-                    Vehicle registration
-                    <input
-                      required
-                      value={vehicleRegistration}
-                      onChange={(e) => setVehicleRegistration(e.target.value)}
-                    />
-                  </label>
+                  {vehicleType !== "Bicycle" && (
+                    <label>
+                      Vehicle registration
+                      <input
+                        required
+                        value={vehicleRegistration}
+                        onChange={(e) => setVehicleRegistration(e.target.value)}
+                      />
+                    </label>
+                  )}
                 </>
               )}
               <button className="zg-primary" disabled={busy}>
