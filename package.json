@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "node tests/backend.mjs",
     "test:safety": "node tests/safety.mjs",
-    "test:browser": "node tests/browser.mjs"
+    "test:browser": "node tests/browser.mjs",
+    "test:services": "node tests/services.mjs"
   },
   "dependencies": {
     "leaflet": "^1.9.4",

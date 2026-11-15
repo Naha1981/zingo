@@ -1,4 +1,5 @@
 import { completedToday } from "./daily";
+import OrderServices from "./OrderServices";
 import DeliveryTracking from "./DeliveryTracking";
 import { Pin, validPin } from "./tracking";
 import { useEffect, useState } from "react";
@@ -34,7 +35,13 @@ import {
 } from "lucide-react";
 
 type OrderStatus =
-  "placed" | "accepted" | "preparing" | "ready" | "picked_up" | "delivered";
+  | "placed"
+  | "accepted"
+  | "preparing"
+  | "ready"
+  | "picked_up"
+  | "delivered"
+  | "cancelled";
 type Order = {
   id: string;
   customerName: string;
@@ -167,6 +174,7 @@ const statusLabel: Record<OrderStatus, string> = {
   ready: "Ready for pickup",
   picked_up: "On the way",
   delivered: "Delivered",
+  cancelled: "Cancelled",
 };
 const nextStatus: Partial<Record<OrderStatus, OrderStatus>> = {
   placed: "accepted",
@@ -378,7 +386,9 @@ export default function App({
     }
   };
 
-  const openOrders = orders.filter((order) => order.status !== "delivered");
+  const openOrders = orders.filter(
+    (order) => !["delivered", "cancelled"].includes(order.status),
+  );
   const completedOrders = completedToday(orders);
 
   return (
@@ -533,7 +543,7 @@ export default function App({
             ) : (
               orders.slice(0, 10).map((order) => (
                 <div key={order.id}>
-                  <OrderCard order={order} busy={busy} />
+                  <OrderCard role={role} order={order} busy={busy} />
                   {order.status === "picked_up" && (
                     <DeliveryTracking order={order} role={role} />
                   )}
@@ -755,6 +765,7 @@ export default function App({
                 {orders.map((order) => (
                   <OrderCard
                     key={order.id}
+                    role={role}
                     order={order}
                     action={
                       ["placed", "accepted", "preparing"].includes(
@@ -854,6 +865,7 @@ export default function App({
                     .map((order) => (
                       <OrderCard
                         key={order.id}
+                        role={role}
                         order={order}
                         action={
                           order.status === "ready"
@@ -1020,7 +1032,12 @@ export default function App({
             {orders.length ? (
               <div className="order-list">
                 {orders.map((order) => (
-                  <OrderCard key={order.id} order={order} busy={busy} />
+                  <OrderCard
+                    key={order.id}
+                    role={role}
+                    order={order}
+                    busy={busy}
+                  />
                 ))}
               </div>
             ) : (
@@ -1236,11 +1253,13 @@ function EmptyOrders({ title, text }: { title: string; text: string }) {
   );
 }
 function OrderCard({
+  role,
   order,
   action,
   actionLabel,
   busy,
 }: {
+  role: "customer" | "restaurant" | "driver" | "admin";
   order: Order;
   action?: () => void;
   actionLabel?: string;
@@ -1285,6 +1304,9 @@ function OrderCard({
           </button>
         )}
       </div>
+      {(role === "customer" || role === "admin") && (
+        <OrderServices id={order.id} owner={role === "admin"} />
+      )}
     </article>
   );
 }

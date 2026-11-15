@@ -116,6 +116,8 @@ try {
     .getByRole("button", { name: "Order food", exact: true })
     .waitFor();
   check(true, "new verified customer onboarding");
+  if (await customer.locator(".toast button").count())
+    await customer.locator(".toast button").click();
   await customer.screenshot({
     path: "/downloads/zingo-fix-customer-15nov.png",
     fullPage: true,
@@ -161,6 +163,8 @@ try {
     "bicycle registration absent",
   );
   await driver.getByRole("checkbox").check();
+  if (await driver.locator(".toast button").count())
+    await driver.locator(".toast button").click();
   await driver.screenshot({
     path: "/downloads/zingo-fix-bicycle-15nov.png",
     fullPage: true,
@@ -191,6 +195,8 @@ try {
     .getByRole("heading", { name: "Fictional kitchen browser QA", exact: true })
     .waitFor();
   check(true, "owner email step-up and applications");
+  if (await admin.locator(".toast button").count())
+    await admin.locator(".toast button").click();
   await admin.screenshot({
     path: "/downloads/zingo-fix-owner-15nov.png",
     fullPage: true,
@@ -233,6 +239,8 @@ try {
   for (const label of ["Accept order", "Start preparing", "Mark ready"]) {
     await restaurant.getByRole("button", { name: label, exact: true }).click();
   }
+  if (await restaurant.locator(".toast button").count())
+    await restaurant.locator(".toast button").click();
   await restaurant.screenshot({
     path: "/downloads/zingo-fix-restaurant-15nov.png",
     fullPage: true,
@@ -246,6 +254,8 @@ try {
     .getByRole("button", { name: "Confirm delivered", exact: true })
     .click();
   await driver.getByText("1 completed deliveries today.").waitFor();
+  if (await driver.locator(".toast button").count())
+    await driver.locator(".toast button").click();
   await driver.screenshot({
     path: "/downloads/zingo-fix-driver-15nov.png",
     fullPage: true,
@@ -254,11 +264,98 @@ try {
   await admin.reload();
   await admin.getByText("Delivered", { exact: true }).waitFor();
   check(true, "owner ledger same delivered order");
+  await customer.goto(base);
+  await customer
+    .getByRole("button", { name: "My orders", exact: true })
+    .click();
+  await customer
+    .getByText("Receipt, test payment & support", { exact: true })
+    .click();
+  await customer
+    .getByText("Paystack test checkout is unavailable", { exact: false })
+    .waitFor();
+  await customer
+    .getByText("Test receipt only. Not proof", { exact: false })
+    .waitFor();
+  check(
+    await customer
+      .getByText("Test receipt only. Not proof", { exact: false })
+      .isVisible(),
+    "customer honest receipt + unavailable provider gate",
+  );
+  await customer.evaluate(() => {
+    window.print = () => {};
+  });
+  await customer
+    .getByRole("button", { name: "Print test receipt", exact: true })
+    .click();
+  await customer.emulateMedia({ media: "print" });
+  check(
+    await customer.locator("#zingo-print-receipt").isVisible(),
+    "isolated printable receipt",
+  );
+  await customer.pdf({
+    path: "/downloads/zingo-test-receipt-15nov.pdf",
+    format: "A4",
+  });
+  await customer.emulateMedia({ media: "screen" });
+  await customer.evaluate(() => window.dispatchEvent(new Event("afterprint")));
+  await customer
+    .getByLabel("Reason", { exact: true })
+    .fill("Fictional order question for owner review");
+  await customer
+    .getByRole("button", { name: "Submit test request", exact: true })
+    .click();
+  await customer.getByText("help · open", { exact: true }).waitFor();
+  check(true, "customer support request saved without a refund");
+  if (await customer.locator(".toast button").count())
+    await customer.locator(".toast button").click();
+  await customer.screenshot({
+    path: "/downloads/zingo-all-customer-support-15nov.png",
+    fullPage: true,
+  });
+  await admin.goto(base);
+  await admin
+    .getByText("Receipt, test payment & support", { exact: true })
+    .click();
+  await admin
+    .getByLabel("Review note help", { exact: true })
+    .fill("Fictional review complete, no money collected");
+  await admin
+    .getByRole("button", { name: "resolved request", exact: true })
+    .click();
+  await admin.getByText("help · resolved", { exact: true }).waitFor();
+  check(true, "owner resolution persisted with response");
+  if (await admin.locator(".toast button").count())
+    await admin.locator(".toast button").click();
+  await admin.screenshot({
+    path: "/downloads/zingo-all-owner-support-15nov.png",
+    fullPage: true,
+  });
+  await customer.reload();
+  await customer
+    .getByText("Receipt, test payment & support", { exact: true })
+    .click();
+  await customer
+    .getByText(
+      "Owner response: Fictional review complete, no money collected",
+      { exact: true },
+    )
+    .waitFor();
+  check(true, "customer sees owner resolution");
+  check(
+    (await customer
+      .getByRole("button", { name: "Request full test refund", exact: true })
+      .count()) === 0,
+    "unconfigured payment refund button absent",
+  );
   for (const route of ["terms", "privacy", "help"]) {
     await customer.goto(base + "/" + route);
     await customer.getByRole("link", { name: "Back to ZINGO" }).waitFor();
     check(true, route + " real content route");
   }
+  if (await customer.locator(".toast button").count())
+    await customer.locator(".toast button").click();
   await customer.screenshot({
     path: "/downloads/zingo-fix-help-15nov.png",
     fullPage: true,

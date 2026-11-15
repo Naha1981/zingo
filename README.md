@@ -58,7 +58,7 @@ This preview was created on the verified Workers Free plan. Limits are shared wi
 
 Use the existing AppDeploy application while this preview is being reviewed. Nothing in this deployment changes its code, domain, credentials or data. A Pages deployment can also be rolled back independently in its deployment history. GitHub publication is a separate approval step.
 
-## 15 November test branch: fixes 1, 2 and 5
+## 15 November test branch: all five fixes
 
 Not pushed or deployed. Branch `staging/15nov-auth-onboarding-totals` starts at `3ddb440`. The original AppDeploy host is not changed by this source. Its provider-managed legal URLs require a separate approved provider setting change; the new `/terms`, `/privacy` and `/help` content applies to this Pages source only. These are restricted-preview notices, not production legal signoff.
 
@@ -69,13 +69,32 @@ Not pushed or deployed. Branch `staging/15nov-auth-onboarding-totals` starts at 
 3. Owner login requires password plus a single-use email confirmation every new session; owner privilege expires after 30 minutes. This is email step-up, not TOTP, passkeys or hardware MFA. Verify actual sender access, session revocation and recovery in an isolated hosted test before exposing the branch. Audit records contain event type/time/account ID only, not tokens/passwords. Set retention and housekeeping before public launch.
 4. Partner setup records service area, contact details, restaurant opening hours/menu review plan and driver vehicle type. It does not collect identity documents or bank details, prove eligibility, edit an operational menu, or verify a real business. Approval requires the owner to record all relevant checks; secure real-world document review and operational menu tooling are not implemented by this patch. Existing approved partner records are not automatically re-approved or rewritten.
 5. Completed-today totals use `Africa/Johannesburg` completion date. New completed orders get `deliveredAt`. Historic orders without a trustworthy completion timestamp are excluded, not guessed to have completed today.
-6. Payment integration, refunds/cancellations and real delivery/GPS validation remain outside these approved fixes. No production settings, data or code were changed.
+6. Fixes 3/4 add a test-only payment adapter and support/cancellation/receipt/refund tooling as described below. Actual provider configuration, sandbox execution, real recipients/fees, production policies and real delivery/GPS validation remain gates. No production settings, data or code were changed.
 
 ### Repeatable tests
 
 - `npm test`: inherited backend order/GPS checks (42).
 - `npm run test:safety`: isolated SQLite auth/onboarding/privacy/date checks (37).
+- `npm run test:services`: test-only payment/support/provider fixtures (47). All provider calls replaced by an in-memory fixture, never a Paystack network call.
 - `npm run build`: strict TypeScript and production bundle.
-- `ZINGO_PLAYWRIGHT_MODULE=/path/to/existing/playwright npm run test:browser`: 26 browser checks with an isolated in-memory database/mail outbox. Uses an existing Chromium at `/usr/bin/google-chrome`. No package installation or real email/payment required. Four separate browser contexts exercise customer, restaurant, driver and owner. The server is bound only to loopback, never a public deployment.
+- `ZINGO_PLAYWRIGHT_MODULE=/path/to/existing/playwright npm run test:browser`: 32 browser checks with an isolated in-memory database/mail outbox. Uses an existing Chromium at `/usr/bin/google-chrome`. No package installation or real email/payment required. Four separate browser contexts exercise customer, restaurant, driver and owner. The server is bound only to loopback, never a public deployment.
 
 The fixture passwords, addresses and accounts in tests are synthetic test-only data and are never written to the hosted app. Owner fixtures are promoted only inside the isolated test database.
+
+### Fixes 3 and 4: test-only provider adapter and support
+
+Migration `0003_test_payments_support.sql` is additive and must only be applied under separate deployment authority. It adds test payment attempts, hashed event dedupe, support cases, refunds and order history. Advanced-mode Pages packaging includes `dist/_worker.js/index.js` and `payment-test.js`; no deployment performed.
+
+- Default is unconfigured: no external checkout, no refund and no real payment route. To exercise a separately approved Paystack sandbox, configure `PAYSTACK_TEST_ENABLED=true`, secret `PAYSTACK_TEST_SECRET` starting `sk_test_`, and an independently approved `PAYSTACK_TEST_SPLIT_CODE` starting `SPL_`. Never use live keys. The patch rejects them. This does not validate split recipients, authority, fees, KYC, settlement or custody. No recipients were invented or configured.
+- Server amounts use ZAR subunits from the saved order, server reference, configured split, and only HTTPS `checkout.paystack.com`. Provider verification checks reference/amount/currency/test domain before marking paid. Restaurant acceptance blocks an initialized but unverified attempt. Initialization persists before provider calls; timeout retries reuse the row instead of requesting another charge. Ambiguous initialization/refund failures need separate provider reconciliation. No automatic retry that might duplicate money movement.
+- Test webhook `/api/payments/paystack-test/webhook` checks raw signatures before parsing and re-fetches transaction/refund status. `PAYSTACK_TEST_WEBHOOK_SECRET` accepts a `whsec_` test secret for modern timestamped `Paystack-Signature`, HMAC SHA-512 and 300-second tolerance. Legacy `x-paystack-signature` is accepted only with no modern secret. Identical verified event bodies dedupe; state updates and one-refund-per-order constraints are idempotent. Actual endpoint delivery remains untested.
+- Customers can open one fictional help/cancellation/dispute case of each kind per order and read their own cases/receipts. A request alone does not stop preparation or move money. Owner decisions require a note. Accepted pre-pickup cancellation is saved atomically with its case; pickup/delivered cancellations need separate resolution. Production deadlines/fees/terms still require owner/legal approval.
+- Owner full test refunds require a reviewed matching case and verified test payment. Provider acknowledgement stays pending until provider verification or a signed and provider-verified event confirms `processed`. No automatic dispute adjudication, chargeback recovery, partial refunds or real payouts.
+- Printable test receipts show item amounts and current payment/refund state. They are not tax invoices or payment proof. Card/bank/identity data is not collected by these forms.
+- Email sender, Paystack credentials, webhook, approved split, actual sandbox checkout/refund, deliverability, real recipients and policy signoff remain separate release gates. These changes are source and fixture proof, not hosted readiness. The hosted preview remains unchanged.
+
+Provider references consulted 15 November 2026:
+
+- https://paystack.com/docs/payments/webhooks/
+- https://paystack.com/docs/api/transaction/
+- https://paystack.com/docs/api/refund/

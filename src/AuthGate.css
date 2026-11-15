@@ -243,3 +243,74 @@
   border-radius: 10px;
   line-height: 1.5;
 }
+
+.order-services {
+  border-top: 1px solid #e4dfd4;
+  margin-top: 16px;
+  padding-top: 16px;
+  font-size: 14px;
+}
+.order-services summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.order-services p {
+  line-height: 1.6;
+  margin: 10px 0;
+}
+.order-services button {
+  margin: 6px 8px 6px 0;
+}
+.order-services textarea {
+  display: block;
+  width: 100%;
+  min-height: 85px;
+  padding: 10px;
+  border: 1px solid #d8d1c2;
+  border-radius: 9px;
+  font: inherit;
+}
+.support-case {
+  padding: 14px;
+  border: 1px solid #ded8cc;
+  border-radius: 12px;
+  margin: 16px 0;
+}
+.receipt-body {
+  padding: 14px;
+  background: #faf8f2;
+  border-radius: 12px;
+  margin: 12px 0;
+}
+.order-services [role="status"] {
+  background: #fff4ce;
+  padding: 12px;
+  border-radius: 10px;
+}
+.status-cancelled {
+  background: #efe6e2;
+  color: #7a3726;
+}
+#zingo-print-receipt {
+  display: none;
+}
+@media print {
+  body > * {
+    display: none !important;
+  }
+  body > #zingo-print-receipt {
+    display: block !important;
+    color: #111;
+    background: white;
+    font:
+      16px/1.6 Arial,
+      sans-serif;
+    margin: 0;
+    padding: 24px;
+    border: 0;
+  }
+  body {
+    background: white;
+    min-height: 0;
+  }
+}

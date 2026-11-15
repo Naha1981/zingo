@@ -16,3 +16,8 @@ CREATE TABLE IF NOT EXISTS auth_tokens(token_hash TEXT PRIMARY KEY,user_id TEXT 
 CREATE INDEX IF NOT EXISTS auth_tokens_user ON auth_tokens(user_id,purpose);
 CREATE TABLE IF NOT EXISTS owner_sessions(token_hash TEXT PRIMARY KEY REFERENCES sessions(token_hash),verified_until INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS access_audit(id TEXT PRIMARY KEY,user_id TEXT,action TEXT NOT NULL,created_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS payment_attempts(reference TEXT PRIMARY KEY,order_id TEXT NOT NULL UNIQUE REFERENCES orders(id),amount INTEGER NOT NULL,currency TEXT NOT NULL,status TEXT NOT NULL,provider_id TEXT,authorization_url TEXT,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS payment_events(event_hash TEXT PRIMARY KEY,event_type TEXT NOT NULL,created_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS support_cases(id TEXT PRIMARY KEY,order_id TEXT NOT NULL REFERENCES orders(id),customer_id TEXT NOT NULL,kind TEXT NOT NULL,reason TEXT NOT NULL,status TEXT NOT NULL,response TEXT,reviewed_by TEXT,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL,UNIQUE(order_id,kind));
+CREATE TABLE IF NOT EXISTS payment_refunds(id TEXT PRIMARY KEY,order_id TEXT NOT NULL UNIQUE REFERENCES orders(id),case_id TEXT NOT NULL REFERENCES support_cases(id),amount INTEGER NOT NULL,status TEXT NOT NULL,provider_id TEXT UNIQUE,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS order_events(id TEXT PRIMARY KEY,order_id TEXT NOT NULL REFERENCES orders(id),actor_id TEXT NOT NULL,action TEXT NOT NULL,created_at INTEGER NOT NULL);

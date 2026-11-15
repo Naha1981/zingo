@@ -1,3 +1,4 @@
+import { paymentWebhook, serviceRoutes } from "./payment-test.js";
 const enc = new TextEncoder();
 const hex = (b) =>
   [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
@@ -178,6 +179,8 @@ async function handler(req, env) {
   if (!path.startsWith("/api/")) return env.ASSETS.fetch(req);
   if (path === "/api/_healthcheck")
     return json({ ok: true, service: "zingo-preview", payments: "disabled" });
+  if (path === "/api/payments/paystack-test/webhook" && method === "POST")
+    return paymentWebhook(req, env);
   if (!["GET", "HEAD"].includes(method)) {
     if (req.headers.get("origin") !== url.origin)
       fail("This request must come from ZINGO.", 403);
@@ -437,6 +440,21 @@ async function handler(req, env) {
           }
         : profile,
     });
+  if (
+    method === "POST" &&
+    /\/(test-checkout|verify-test-payment|support|case-decision|test-refund|verify-test-refund)$/.test(
+      path,
+    )
+  )
+    await limit(db, req, "order-service:" + user.id, 40);
+  const serviceResult = await serviceRoutes(req, env, {
+    path,
+    method,
+    body,
+    user,
+    profile,
+  });
+  if (serviceResult) return serviceResult;
   if (path === "/api/onboarding" && method === "POST") {
     if (profile || user.is_admin) fail("This account already has a role.", 409);
     const role = body.role,
@@ -802,6 +820,14 @@ async function handler(req, env) {
         ))
           fail("Delivery unavailable.", 409);
       } else fail("This account cannot update this order.", 403);
+      if (body.status === "accepted") {
+        const payment = await db
+          .prepare("SELECT status FROM payment_attempts WHERE order_id=?")
+          .bind(id)
+          .first();
+        if (payment && payment.status !== "paid")
+          fail("Test payment is not verified. Do not prepare the order.", 409);
+      }
       data.status = body.status;
       if (body.status === "delivered") data.deliveredAt = Date.now();
       if (driver) data.driverId = driver;
