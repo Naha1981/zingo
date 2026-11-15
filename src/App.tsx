@@ -32,12 +32,7 @@ import {
 } from "lucide-react";
 
 type OrderStatus =
-  | "placed"
-  | "accepted"
-  | "preparing"
-  | "ready"
-  | "picked_up"
-  | "delivered";
+  "placed" | "accepted" | "preparing" | "ready" | "picked_up" | "delivered";
 type Order = {
   id: string;
   customerName: string;
@@ -189,9 +184,11 @@ function allocation(food: number, delivery: number) {
 export default function App({
   role,
   onSignOut,
+  guest = false,
 }: {
   role: "customer" | "restaurant" | "driver" | "admin";
   onSignOut: () => void;
+  guest?: boolean;
 }) {
   const [view, setView] = useState<
     "customer" | "restaurant" | "driver" | "admin"
@@ -240,6 +237,10 @@ export default function App({
   };
   const [notice, setNotice] = useState("");
   const refreshOrders = async () => {
+    if (guest) {
+      setLoading(false);
+      return;
+    }
     try {
       const result = await api.get("/api/orders");
       setOrders(result.data.orders || []);
@@ -251,6 +252,7 @@ export default function App({
   };
   useEffect(() => {
     refreshOrders();
+    if (guest) return;
     api
       .get("/api/restaurants")
       .then((r) => {
@@ -304,6 +306,10 @@ export default function App({
     );
 
   const placeOrder = async () => {
+    if (guest) {
+      onSignOut();
+      return;
+    }
     if (!cart.length || !address.trim()) return;
     if (destination && !validPin(destination)) {
       setPinMessage("Complete both coordinates, or clear the pin.");
@@ -418,7 +424,7 @@ export default function App({
           <button
             className="avatar-btn"
             onClick={onSignOut}
-            aria-label="Sign out"
+            aria-label={guest ? "Sign in" : "Sign out"}
           >
             <CircleUserRound size={19} />
           </button>
@@ -454,9 +460,11 @@ export default function App({
           <button
             className="role-tab"
             onClick={() =>
-              document
-                .getElementById("customer-orders")
-                ?.scrollIntoView({ behavior: "smooth" })
+              guest
+                ? onSignOut()
+                : document
+                    .getElementById("customer-orders")
+                    ?.scrollIntoView({ behavior: "smooth" })
             }
           >
             <Package size={16} />
@@ -518,34 +526,38 @@ export default function App({
             </div>
           </section>
 
-          <section className="section-block" id="customer-orders">
-            <div className="section-heading">
-              <div>
-                <span className="eyebrow">YOUR TEST ORDERS</span>
-                <h2>Order status & delivery GPS</h2>
-              </div>
-              <button className="gps-button secondary" onClick={refreshOrders}>
-                Refresh orders
-              </button>
-            </div>
-            <p className="muted">
-              Status refreshes every 10 seconds while this page is visible. GPS
-              appears after pickup.
-            </p>
-            {orders.length === 0 ? (
-              <p>No test orders yet.</p>
-            ) : (
-              orders.slice(0, 10).map((order) => (
-                <div key={order.id}>
-                  <OrderCard order={order} busy={busy} />
-                  {order.status === "picked_up" && (
-                    <DeliveryTracking order={order} role={role} />
-                  )}
+          {!guest && (
+            <section className="section-block" id="customer-orders">
+              <div className="section-heading">
+                <div>
+                  <span className="eyebrow">YOUR TEST ORDERS</span>
+                  <h2>Order status & delivery GPS</h2>
                 </div>
-              ))
-            )}
-          </section>
-
+                <button
+                  className="gps-button secondary"
+                  onClick={refreshOrders}
+                >
+                  Refresh orders
+                </button>
+              </div>
+              <p className="muted">
+                Status refreshes every 10 seconds while this page is visible.
+                GPS appears after pickup.
+              </p>
+              {orders.length === 0 ? (
+                <p>No test orders yet.</p>
+              ) : (
+                orders.slice(0, 10).map((order) => (
+                  <div key={order.id}>
+                    <OrderCard order={order} busy={busy} />
+                    {order.status === "picked_up" && (
+                      <DeliveryTracking order={order} role={role} />
+                    )}
+                  </div>
+                ))
+              )}
+            </section>
+          )}
           <section className="offer-strip">
             <div>
               <span className="eyebrow">A BETTER WAY TO ORDER</span>
@@ -605,8 +617,9 @@ export default function App({
             <div className="restaurant-grid">
               {availableRestaurants.length === 0 && (
                 <p>
-                  No approved restaurants yet. This is a preview, not a live
-                  food service.
+                  {guest
+                    ? "Sign in to see approved test restaurants. This is a preview, not a live food service."
+                    : "No approved restaurants yet. This is a preview, not a live food service."}
                 </p>
               )}
               {availableRestaurants.map((restaurant) => (
@@ -658,7 +671,9 @@ export default function App({
                 <h2>Sample dishes</h2>
               </div>
               <span className="muted">
-                Ordering from {selectedRestaurant.name}
+                {guest
+                  ? "Fictional examples, not a live menu"
+                  : "Ordering from " + selectedRestaurant.name}
               </span>
             </div>
             <div className="menu-grid">
@@ -1164,17 +1179,22 @@ export default function App({
             <button
               className="checkout-button"
               disabled={
-                !cart.length ||
-                busy ||
-                !address.trim() ||
-                (!!destination && !validPin(destination)) ||
-                !availableRestaurants.some(
-                  (r) => r.id === selectedRestaurant.id,
-                )
+                !guest &&
+                (!cart.length ||
+                  busy ||
+                  !address.trim() ||
+                  (!!destination && !validPin(destination)) ||
+                  !availableRestaurants.some(
+                    (r) => r.id === selectedRestaurant.id,
+                  ))
               }
               onClick={placeOrder}
             >
-              {busy ? "Placing order…" : "Place demo order · " + money(total)}{" "}
+              {guest
+                ? "Sign in to place a test order"
+                : busy
+                  ? "Placing order…"
+                  : "Place demo order · " + money(total)}{" "}
               <ArrowRight size={17} />
             </button>
             <p className="fine-print">

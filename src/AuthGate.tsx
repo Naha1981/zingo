@@ -62,6 +62,7 @@ export default function AuthGate() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [createAccount, setCreateAccount] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
 
   const loadProfile = async () => {
     const current = await auth.getUser();
@@ -130,6 +131,7 @@ export default function AuthGate() {
     setPassword("");
     setEmail("");
     setCreateAccount(false);
+    setShowAuth(false);
     setMessage("");
   };
 
@@ -172,10 +174,16 @@ export default function AuthGate() {
       </div>
     );
 
+  if (!user && !showAuth)
+    return <App role="customer" guest onSignOut={() => setShowAuth(true)} />;
+
   if (!user)
     return (
       <div className="zg-screen">
         <section className="zg-card zg-login">
+          <button className="zg-text-button" onClick={() => setShowAuth(false)}>
+            Back to Home
+          </button>
           <div className="zg-logo">
             <img className="brand-logo" src="/zingo-logo.png" alt="ZINGO" />
           </div>
