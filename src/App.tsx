@@ -1,3 +1,10 @@
+import {
+  readBasket,
+  saveBasket,
+  resumeBasket,
+  consumeResume,
+  clearBasket,
+} from "./basket";
 import DeliveryTracking from "./DeliveryTracking";
 import { Pin, validPin } from "./tracking";
 import { useEffect, useState } from "react";
@@ -195,7 +202,13 @@ export default function App({
   >(role);
   const [cart, setCart] = useState<
     { item: (typeof menu)[number]; qty: number }[]
-  >([]);
+  >(() => (role === "customer" ? readBasket(menu) : []));
+  useEffect(() => {
+    if (role === "customer") saveBasket(cart);
+  }, [cart, role]);
+  useEffect(() => {
+    if (!guest) consumeResume();
+  }, [guest]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -205,7 +218,9 @@ export default function App({
     typeof restaurants
   >([]);
   const [selectedRestaurant, setSelectedRestaurant] = useState(restaurants[0]);
-  const [showCart, setShowCart] = useState(false);
+  const [showCart, setShowCart] = useState(
+    () => !guest && role === "customer" && resumeBasket(),
+  );
   const [address, setAddress] = useState("");
 
   const [destination, setDestination] = useState<Pin | null>(null);
@@ -276,7 +291,7 @@ export default function App({
     (sum, row) => sum + row.item.price * row.qty,
     0,
   );
-  const deliveryFee = 35;
+  const deliveryFee = cart.length ? 35 : 0;
   const totals = allocation(foodSubtotal, deliveryFee);
   const total = foodSubtotal + deliveryFee;
   const filteredMenu = menu.filter(
@@ -291,7 +306,9 @@ export default function App({
       const found = current.find((row) => row.item.id === item.id);
       return found
         ? current.map((row) =>
-            row.item.id === item.id ? { ...row, qty: row.qty + 1 } : row,
+            row.item.id === item.id
+              ? { ...row, qty: Math.min(20, row.qty + 1) }
+              : row,
           )
         : [...current, { item, qty: 1 }];
     });
@@ -300,13 +317,17 @@ export default function App({
     setCart((current) =>
       current
         .map((row) =>
-          row.item.id === id ? { ...row, qty: row.qty + amount } : row,
+          row.item.id === id
+            ? { ...row, qty: Math.min(20, row.qty + amount) }
+            : row,
         )
         .filter((row) => row.qty > 0),
     );
 
   const placeOrder = async () => {
     if (guest) {
+      saveBasket(cart);
+      resumeBasket(true);
       onSignOut();
       return;
     }
@@ -339,6 +360,7 @@ export default function App({
         result.data.order,
         ...current.filter((order) => order.id !== result.data.order.id),
       ]);
+      clearBasket();
       setCart([]);
       setShowCart(false);
       setNotice(
@@ -1179,14 +1201,14 @@ export default function App({
             <button
               className="checkout-button"
               disabled={
-                !guest &&
-                (!cart.length ||
-                  busy ||
-                  !address.trim() ||
-                  (!!destination && !validPin(destination)) ||
-                  !availableRestaurants.some(
-                    (r) => r.id === selectedRestaurant.id,
-                  ))
+                !cart.length ||
+                (!guest &&
+                  (busy ||
+                    !address.trim() ||
+                    (!!destination && !validPin(destination)) ||
+                    !availableRestaurants.some(
+                      (r) => r.id === selectedRestaurant.id,
+                    )))
               }
               onClick={placeOrder}
             >

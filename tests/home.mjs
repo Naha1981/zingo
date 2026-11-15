@@ -9,6 +9,9 @@ const sql = new DatabaseSync(":memory:");
 sql.exec(
   fs.readFileSync(new URL("../cloudflare/schema.sql", import.meta.url), "utf8"),
 );
+sql.exec(
+  `INSERT INTO users VALUES('fictional-kitchen','kitchen@test.invalid','none','none',0,0); INSERT INTO profiles VALUES('fictional-kitchen','restaurant','approved','Fictional QA Kitchen','{"businessName":"Fictional QA Kitchen","cuisine":"Fictional demo"}');`,
+);
 function stmt(query, values = []) {
   return {
     bind(...v) {
@@ -129,6 +132,9 @@ try {
     await p
       .getByRole("heading", { name: "What are you going to eat today?" })
       .waitFor();
+    await p
+      .getByRole("button", { name: "Add Double Smash Burger", exact: true })
+      .click();
     await p.getByRole("button", { name: "Open cart", exact: true }).click();
     await p
       .getByRole("button", {
@@ -138,6 +144,19 @@ try {
       .click();
     await p.getByRole("textbox", { name: "Password", exact: true }).waitFor();
     check(true, width + " checkout requires sign-in");
+    await p.getByRole("button", { name: "Back to Home", exact: true }).click();
+    await p.getByRole("button", { name: "Open cart", exact: true }).click();
+    check(
+      (await p.getByText("Double Smash Burger", { exact: true }).count()) > 0,
+      width + " basket survives auth boundary",
+    );
+    await p.reload();
+    await p.getByRole("button", { name: "Open cart", exact: true }).click();
+    check(
+      (await p.getByText("Double Smash Burger", { exact: true }).count()) > 0,
+      width + " basket survives reload",
+    );
+
     await p.reload();
     await p
       .getByRole("heading", { name: "What are you going to eat today?" })
@@ -148,6 +167,73 @@ try {
         await context.request.get("http://localhost:4198/api/orders")
       ).status() === 401,
       width + " backend order privacy unchanged",
+    );
+    await p.reload();
+    await p.getByRole("button", { name: "Open cart", exact: true }).click();
+    await p
+      .getByRole("button", {
+        name: "Sign in to place a test order",
+        exact: true,
+      })
+      .click();
+    await p
+      .getByRole("button", { name: "New here? Create an account", exact: true })
+      .click();
+    await p
+      .getByRole("textbox", { name: "Email", exact: true })
+      .fill("basket" + width + "@test.invalid");
+    await p
+      .getByRole("textbox", { name: "Password", exact: true })
+      .fill("Fixture-only-NotARealLogin-123!");
+    await p
+      .getByRole("button", { name: "Create preview account", exact: true })
+      .click();
+    await p
+      .getByRole("button", {
+        name: "Customer Discover restaurants and order food.",
+        exact: true,
+      })
+      .click();
+    await p
+      .getByRole("textbox", { name: "Full name", exact: true })
+      .fill("Fictional QA");
+    await p
+      .getByRole("button", { name: "Create my customer account", exact: true })
+      .click();
+    await p
+      .getByRole("textbox", { name: "Delivery location", exact: true })
+      .waitFor();
+    check(
+      (await p.getByText("Double Smash Burger", { exact: true }).count()) > 0,
+      width + " signup resumes populated basket",
+    );
+    await p
+      .getByRole("textbox", { name: "Delivery location", exact: true })
+      .fill("Fictional test only no dispatch");
+    check(
+      await p
+        .getByRole("button", {
+          name: "Place demo order · R124.00",
+          exact: true,
+        })
+        .isEnabled(),
+      width + " correct enabled checkout after signup",
+    );
+    await p.screenshot({
+      path: "/downloads/zingo-basket-signup-" + width + ".png",
+      fullPage: true,
+    });
+    await p.locator(".drawer-heading button").click();
+    await p.getByRole("button", { name: "Sign out", exact: true }).click();
+    await p.getByRole("button", { name: "Open cart", exact: true }).waitFor();
+    await p.getByRole("button", { name: "Open cart", exact: true }).click();
+    check(
+      await p.getByText("Your basket is empty", { exact: true }).isVisible(),
+      width + " signout clears basket",
+    );
+    check(
+      (await p.getByText("R0.00", { exact: true }).count()) >= 3,
+      width + " empty totals zero",
     );
     check(errors.length === 0, width + " no browser errors");
     await p.screenshot({

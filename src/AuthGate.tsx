@@ -1,3 +1,4 @@
+import { clearBasket } from "./basket";
 import { useEffect, useState } from "react";
 import { auth, api } from "./client";
 import {
@@ -119,6 +120,7 @@ export default function AuthGate() {
 
   const signOut = async () => {
     await auth.signOut();
+    clearBasket();
     setUser(null);
     setProfile(null);
     setRole(null);
@@ -175,7 +177,14 @@ export default function AuthGate() {
     );
 
   if (!user && !showAuth)
-    return <App role="customer" guest onSignOut={() => setShowAuth(true)} />;
+    return (
+      <App
+        key="guest"
+        role="customer"
+        guest
+        onSignOut={() => setShowAuth(true)}
+      />
+    );
 
   if (!user)
     return (
@@ -421,5 +430,11 @@ export default function AuthGate() {
       </div>
     );
 
-  return <App role={profile.role} onSignOut={signOut} />;
+  return (
+    <App
+      key="signed-in"
+      role={profile.role}
+      onSignOut={signOut}
+    />
+  );
 }
