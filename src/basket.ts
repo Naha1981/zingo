@@ -8,8 +8,26 @@ export function readBasket<T extends { id: string }>(
     const seen = new Set<string>();
     return v.slice(0, 20).flatMap((r: unknown) => {
       if (!r || typeof r !== "object") return [];
-      const x = r as { id?: unknown; qty?: unknown };
-      const item = menu.find((m) => m.id === x.id);
+      const x = r as { id?: unknown; qty?: unknown; item?: any };
+      let item = menu.find((m) => m.id === x.id);
+      if (
+        !item &&
+        typeof x.id === "string" &&
+        /^[a-f0-9-]{36}$/.test(x.id) &&
+        x.item &&
+        x.item.id === x.id &&
+        typeof x.item.name === "string" &&
+        x.item.name.length <= 80 &&
+        typeof x.item.description === "string" &&
+        x.item.description.length <= 240 &&
+        ["Burgers", "Pizza", "Chicken", "Sides"].includes(x.item.category) &&
+        typeof x.item.price === "number" &&
+        Number.isFinite(x.item.price) &&
+        x.item.price >= 1 &&
+        x.item.price <= 10000
+      ) {
+        item = { ...x.item, image: "", rating: 0 } as T;
+      }
       if (
         !item ||
         seen.has(item.id) ||
@@ -31,7 +49,9 @@ export function saveBasket<T extends { id: string }>(
   try {
     sessionStorage.setItem(
       basketKey,
-      JSON.stringify(rows.map((r) => ({ id: r.item.id, qty: r.qty }))),
+      JSON.stringify(
+        rows.map((r) => ({ id: r.item.id, qty: r.qty, item: r.item })),
+      ),
     );
   } catch {}
 }
@@ -39,6 +59,7 @@ export function clearBasket() {
   try {
     sessionStorage.removeItem(basketKey);
     sessionStorage.removeItem(basketKey + "-resume");
+    sessionStorage.removeItem("zingo-preview-restaurant");
   } catch {}
 }
 export function resumeBasket(set = false) {

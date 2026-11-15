@@ -5,6 +5,7 @@ import {
   consumeResume,
   clearBasket,
 } from "./basket";
+import RestaurantMenu from "./RestaurantMenu";
 import DeliveryTracking from "./DeliveryTracking";
 import { Pin, validPin } from "./tracking";
 import { useEffect, useState } from "react";
@@ -209,6 +210,7 @@ export default function App({
   useEffect(() => {
     if (!guest) consumeResume();
   }, [guest]);
+  const [customMenu, setCustomMenu] = useState<typeof menu>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -277,7 +279,14 @@ export default function App({
           tag: "Preview menu",
         }));
         setAvailableRestaurants(approved);
-        if (approved[0]) setSelectedRestaurant(approved[0]);
+        let saved = "";
+        try {
+          saved = sessionStorage.getItem("zingo-preview-restaurant") || "";
+        } catch {}
+        if (approved[0])
+          setSelectedRestaurant(
+            approved.find((r: any) => r.id === saved) || approved[0],
+          );
       })
       .catch(() => setNotice("Restaurant list is unavailable."));
     const timer = setInterval(() => {
@@ -286,6 +295,35 @@ export default function App({
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    setCustomMenu([]);
+    if (
+      guest ||
+      role !== "customer" ||
+      !availableRestaurants.some((r) => r.id === selectedRestaurant.id)
+    )
+      return;
+    let active = true;
+    api
+      .get("/api/restaurants/" + selectedRestaurant.id + "/menu")
+      .then((r) => {
+        if (active)
+          setCustomMenu(
+            r.data.items.map((x: any) => ({
+              ...(menu.find((m) => m.category === x.category) || menu[0]),
+              ...x,
+              image: "",
+              rating: 0,
+            })),
+          );
+      })
+      .catch(() =>
+        setNotice("Custom menu could not load. Refresh before ordering."),
+      );
+    return () => {
+      active = false;
+    };
+  }, [guest, role, selectedRestaurant.id, availableRestaurants]);
   const cartCount = cart.reduce((sum, row) => sum + row.qty, 0);
   const foodSubtotal = cart.reduce(
     (sum, row) => sum + row.item.price * row.qty,
@@ -294,7 +332,7 @@ export default function App({
   const deliveryFee = cart.length ? 35 : 0;
   const totals = allocation(foodSubtotal, deliveryFee);
   const total = foodSubtotal + deliveryFee;
-  const filteredMenu = menu.filter(
+  const filteredMenu = [...menu, ...customMenu].filter(
     (item) =>
       (category === "All" || item.category === category) &&
       (item.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -347,6 +385,7 @@ export default function App({
         restaurant: selectedRestaurant.name,
         restaurantId: selectedRestaurant.id,
         items: cart.map((row) => ({
+          id: row.item.id,
           name: row.item.name,
           qty: row.qty,
           price: row.item.price,
@@ -652,7 +691,18 @@ export default function App({
                       : "restaurant-card"
                   }
                   key={restaurant.id}
-                  onClick={() => setSelectedRestaurant(restaurant)}
+                  onClick={() => {
+                    if (restaurant.id !== selectedRestaurant.id) {
+                      setCart([]);
+                      try {
+                        sessionStorage.setItem(
+                          "zingo-preview-restaurant",
+                          restaurant.id,
+                        );
+                      } catch {}
+                      setSelectedRestaurant(restaurant);
+                    }
+                  }}
                 >
                   <div className="restaurant-photo">
                     <img src={restaurant.image} alt={restaurant.name} />
@@ -702,11 +752,30 @@ export default function App({
               {filteredMenu.map((item) => (
                 <article className="menu-card" key={item.id}>
                   <div className="menu-photo">
-                    <img src={item.image} alt={item.name} />
-                    <span>
-                      <Star size={12} fill="currentColor" />
-                      {item.rating}
-                    </span>
+                    {item.image ? (
+                      <img src={item.image} alt={item.name} />
+                    ) : (
+                      <div
+                        style={{
+                          height: "100%",
+                          display: "grid",
+                          placeItems: "center",
+                          background: "#eee9dd",
+                          fontSize: 36,
+                        }}
+                        aria-label="Custom test dish"
+                      >
+                        🍽
+                      </div>
+                    )}
+                    {item.rating > 0 ? (
+                      <span>
+                        <Star size={12} fill="currentColor" />
+                        {item.rating}
+                      </span>
+                    ) : (
+                      <span>Test dish</span>
+                    )}
                   </div>
                   <div className="menu-info">
                     <div>
@@ -750,6 +819,7 @@ export default function App({
               <i /> Demo workspace
             </span>
           </div>
+          <RestaurantMenu />
           <div className="metric-row">
             <Metric
               label="Open orders"

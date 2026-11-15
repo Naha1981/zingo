@@ -118,6 +118,97 @@ check(
   ).status === 409,
   "role immutable",
 );
+const dish = {
+  name: "FICTIONAL Menu QA Dish",
+  description: "Fictional test only",
+  category: "Sides",
+  price: 57.25,
+};
+check(
+  (await call("POST", "/api/menu-items", dish, customer.cookie)).status === 403,
+  "customer cannot create restaurant dish",
+);
+check(
+  (await call("POST", "/api/menu-items", dish, driver.cookie)).status === 403,
+  "driver cannot create restaurant dish",
+);
+for (const price of [0, -1, 10001, 1.555, "57"])
+  check(
+    (
+      await call(
+        "POST",
+        "/api/menu-items",
+        { ...dish, price },
+        restaurant.cookie,
+      )
+    ).status === 400,
+    "invalid menu price rejected " + price,
+  );
+const custom = await call("POST", "/api/menu-items", dish, restaurant.cookie);
+check(custom.status === 201, "approved restaurant creates dish");
+check(
+  (await call("POST", "/api/menu-items", dish, restaurant.cookie)).status ===
+    400,
+  "duplicate dish rejected",
+);
+const list = await call(
+  "GET",
+  "/api/restaurants/" + restaurant.id + "/menu",
+  undefined,
+  customer.cookie,
+);
+check(
+  list.body.items.length === 1 && list.body.items[0].price === 57.25,
+  "restaurant dish persists and customer can read",
+);
+const rest2 = await signup("restaurant2", "restaurant");
+check(
+  (await call("POST", "/api/menu-items", dish, rest2.cookie)).status === 403,
+  "pending restaurant cannot create menu",
+);
+sql.prepare("UPDATE profiles SET status='approved' WHERE id=?").run(rest2.id);
+check(
+  (
+    await call(
+      "GET",
+      "/api/restaurants/" + rest2.id + "/menu",
+      undefined,
+      customer.cookie,
+    )
+  ).body.items.length === 0,
+  "other restaurant menu is isolated",
+);
+const customOrder = await call(
+  "POST",
+  "/api/orders",
+  {
+    items: [{ id: custom.body.item.id, name: "tampered", qty: 2, price: 0.01 }],
+    restaurantId: restaurant.id,
+    address: "FICTIONAL",
+  },
+  customer.cookie,
+);
+check(
+  customOrder.status === 201 &&
+    customOrder.body.order.total === 149.5 &&
+    customOrder.body.order.items[0].name === dish.name,
+  "custom dish order uses server-owned name and price",
+);
+check(
+  (
+    await call(
+      "POST",
+      "/api/orders",
+      {
+        items: [{ id: custom.body.item.id, name: dish.name, qty: 1 }],
+        restaurantId: rest2.id,
+        address: "FICTIONAL",
+      },
+      customer.cookie,
+    )
+  ).status === 400,
+  "cross-restaurant dish rejected",
+);
 const invalid = await call(
   "POST",
   "/api/orders",

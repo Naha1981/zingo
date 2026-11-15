@@ -240,6 +240,38 @@ try {
       path: "/downloads/zingo-home-before-release-" + width + ".png",
       fullPage: true,
     });
+    const base='http://localhost:4198';
+    const fixtureHeaders={Origin:base,'Content-Type':'application/json'};
+    const reg=await context.request.post(base+'/api/auth/register',{headers:fixtureHeaders,data:{email:'merchant'+width+'@test.invalid',password:'Fixture-only-NotARealLogin-123!'}});
+    const account=await reg.json();
+    await context.request.post(base+'/api/onboarding',{headers:fixtureHeaders,data:{role:'restaurant',fullName:'Fictional merchant',phone:'000-TEST',businessName:'FICTIONAL Menu '+width,businessAddress:'Fictional only',cuisine:'Test'}});
+    sql.prepare("UPDATE profiles SET status='approved' WHERE id=?").run(account.user.userId);
+    await p.reload();
+    await p.getByRole('textbox',{name:'Dish name',exact:true}).fill('FICTIONAL UI dish '+width);
+    await p.getByRole('textbox',{name:'Dish description',exact:true}).fill('Fictional dish for UI verification only');
+    await p.getByRole('spinbutton',{name:'Dish price (ZAR)',exact:true}).fill('57.25');
+    await p.getByRole('button',{name:'Add test dish',exact:true}).click();
+    await p.getByRole('heading',{name:'Saved test dishes (1)',exact:true}).waitFor();
+    check(true,width+' merchant UI saves persisted menu item');
+    check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),width+' merchant menu no overflow');
+    await p.screenshot({path:'/downloads/zingo-menu-merchant-'+width+'.png',fullPage:true});
+    await p.reload();
+    await p.getByRole('heading',{name:'Saved test dishes (1)',exact:true}).waitFor();
+    check(true,width+' merchant menu survives reload');
+    await p.getByRole('button',{name:'Sign out',exact:true}).click();
+    await p.getByRole('button',{name:'Sign in',exact:true}).waitFor();
+    await context.request.post(base+'/api/auth/login',{headers:fixtureHeaders,data:{email:'basket'+width+'@test.invalid',password:'Fixture-only-NotARealLogin-123!'}});
+    await p.reload();
+    await p.getByRole('button').filter({hasText:'FICTIONAL Menu '+width}).click();
+    await p.getByRole('button',{name:'Add FICTIONAL UI dish '+width,exact:true}).click();
+    await p.reload();
+    await p.getByRole('button',{name:'Open cart',exact:true}).click();
+    check(await p.getByRole('button',{name:'Place demo order · R92.25',exact:true}).count()===1,width+' custom basket and selected restaurant survive reload');
+    await p.getByRole('textbox',{name:'Delivery location',exact:true}).fill('Fictional no dispatch');
+    await p.getByRole('button',{name:'Place demo order · R92.25',exact:true}).click();
+    await p.getByText('Test order saved.',{exact:false}).waitFor();
+    check(true,width+' UI custom menu checkout succeeds');
+    check(errors.length===0,width+' no custom menu browser errors');
     await context.close();
   }
 } finally {

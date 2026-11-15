@@ -319,6 +319,67 @@ async function handler(req, env) {
       }),
     });
   }
+  const menuRoute = path.match(/^\/api\/restaurants\/([^/]+)\/menu$/);
+  if (menuRoute && method === "GET") {
+    const r = await db
+      .prepare(
+        "SELECT * FROM profiles WHERE id=? AND role='restaurant' AND status='approved'",
+      )
+      .bind(menuRoute[1])
+      .first();
+    if (!r) fail("Restaurant not found.", 404);
+    return json({ items: JSON.parse(r.data).menuItems || [] });
+  }
+  if (path === "/api/menu-items" && method === "POST") {
+    if (profile?.role !== "restaurant" || profile.status !== "approved")
+      fail("Approved restaurant access required.", 403);
+    const name = clean(body.name, 80),
+      description = clean(body.description, 240),
+      category = clean(body.category, 30),
+      price = body.price;
+    if (
+      !name ||
+      !description ||
+      !["Burgers", "Pizza", "Chicken", "Sides"].includes(category) ||
+      typeof price !== "number" ||
+      !Number.isFinite(price) ||
+      price < 1 ||
+      price > 10000 ||
+      round(price) !== price
+    )
+      fail(
+        "Use a name, description, category and price from R1 to R10000 with at most two decimal places.",
+      );
+    const row = await db
+      .prepare("SELECT * FROM profiles WHERE id=?")
+      .bind(user.id)
+      .first();
+    const data = JSON.parse(row.data),
+      items = data.menuItems || [];
+    if (items.length >= 50)
+      fail("This preview supports 50 custom dishes per restaurant.");
+    if (
+      Object.hasOwn(prices, name) ||
+      items.some((x) => x.name.toLowerCase() === name.toLowerCase())
+    )
+      fail("Choose a unique dish name.");
+    const item = {
+      id: crypto.randomUUID(),
+      name,
+      description,
+      category,
+      price,
+    };
+    const next = { ...data, menuItems: [...items, item] };
+    const r = await db
+      .prepare(
+        "UPDATE profiles SET data=? WHERE id=? AND data=? AND status='approved'",
+      )
+      .bind(JSON.stringify(next), user.id, row.data)
+      .run();
+    if (!r.meta.changes) fail("Menu changed. Refresh and try again.", 409);
+    return json({ item }, 201);
+  }
   if (path === "/api/orders" && method === "GET") {
     let stmt;
     if (user.is_admin)
@@ -376,15 +437,17 @@ async function handler(req, env) {
       .bind(clean(body.restaurantId, 80))
       .first();
     if (!rest) fail("Choose an approved preview restaurant.");
+    const customMenu = JSON.parse(rest.data).menuItems || [];
     const items = body.items.map((i) => {
-      if (
-        !prices[i.name] ||
-        !Number.isInteger(i.qty) ||
-        i.qty < 1 ||
-        i.qty > 20
-      )
+      const custom = i.id ? customMenu.find((x) => x.id === i.id) : null;
+      const price = custom
+        ? custom.price
+        : !i.id || /^m[1-6]$/.test(i.id)
+          ? prices[i.name]
+          : null;
+      if (!price || !Number.isInteger(i.qty) || i.qty < 1 || i.qty > 20)
         fail("Invalid menu item.");
-      return { name: i.name, qty: i.qty, price: prices[i.name] };
+      return { name: custom ? custom.name : i.name, qty: i.qty, price };
     });
     const food = round(items.reduce((s, i) => s + i.qty * i.price, 0)),
       delivery = 35;
@@ -514,13 +577,11 @@ async function handler(req, env) {
         ) {
           driver = user.id;
           data.driverName = profile.fullName;
-        } else if (
-          !(
-            row.status === "picked_up" &&
-            body.status === "delivered" &&
-            row.driver_id === user.id
-          )
-        )
+        } else if (!(
+          row.status === "picked_up" &&
+          body.status === "delivered" &&
+          row.driver_id === user.id
+        ))
           fail("Delivery unavailable.", 409);
       } else fail("This account cannot update this order.", 403);
       data.status = body.status;
